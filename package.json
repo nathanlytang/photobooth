@@ -1,0 +1,16 @@
+{
+  "name": "photobooth",
+  "version": "1.0.0",
+  "description": "Photobooth with HDMI capture live preview and gphoto2 camera control",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": ["photobooth", "gphoto2"],
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.21.0",
+    "ws": "^8.18.0"
+  }
+}
