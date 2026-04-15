@@ -10,16 +10,28 @@ const SETTING_MAP = {
   whiteBalance: '/main/imgsettings/whitebalance',
 };
 
+// Mutex to serialize all USB access — prevents "Could not claim the USB device"
+let usbLock = Promise.resolve();
+
+function withUsbLock(fn) {
+  const next = usbLock.then(fn, fn);
+  usbLock = next.catch(() => {});
+  return next;
+}
+
 function gphoto2(args, timeout = 30000) {
-  return new Promise((resolve, reject) => {
-    execFile('gphoto2', args, { timeout }, (err, stdout, stderr) => {
+  return withUsbLock(() => new Promise((resolve, reject) => {
+    const proc = execFile('gphoto2', args, { timeout, killSignal: 'SIGKILL' }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(`gphoto2 ${args.join(' ')} failed: ${err.message}\n${stderr}`));
         return;
       }
       resolve(stdout.trim());
     });
-  });
+
+    // Ensure zombie processes are cleaned up on timeout
+    proc.on('error', () => {});
+  }));
 }
 
 async function applySettings() {
@@ -101,15 +113,25 @@ async function captureAndDownload(destDir, photoNumber) {
   return { filename, path: destPath };
 }
 
-async function detectCamera() {
-  try {
-    const output = await gphoto2(['--auto-detect']);
-    console.log('[camera] Detected cameras:\n', output);
-    return output;
-  } catch (err) {
-    console.error('[camera] No camera detected:', err.message);
-    return null;
+async function detectCamera(retryInterval = 5000, maxRetries = Infinity) {
+  let attempts = 0;
+  while (attempts < maxRetries) {
+    attempts++;
+    try {
+      const output = await gphoto2(['--auto-detect']);
+      // Check if any real camera line exists (not just the header)
+      const lines = output.split('\n').filter(l => l.trim() && !l.startsWith('Model') && !l.startsWith('-'));
+      if (lines.length > 0) {
+        console.log('[camera] Detected cameras:\n', output);
+        return output;
+      }
+    } catch (err) {
+      // detection failed
+    }
+    console.log(`[camera] No camera detected — is it turned on? Retrying in ${retryInterval / 1000}s... (attempt ${attempts})`);
+    await new Promise(resolve => setTimeout(resolve, retryInterval));
   }
+  throw new Error('Camera not detected after maximum retries');
 }
 
 async function triggerAutofocus() {
