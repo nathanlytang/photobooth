@@ -163,12 +163,16 @@
         startCountdown(payload.seconds);
         break;
 
-      case 'capture:complete':
-        isCapturing = false;
+      case 'capture:captured':
         hideOverlay(screenProcessing);
         triggerFlash();
-        addThumbnail(payload.url);
+        addThumbnailPlaceholder(payload.photoNumber);
         btnCapture.disabled = false;
+        isCapturing = false;
+        break;
+
+      case 'capture:complete':
+        replaceThumbnailPlaceholder(payload.photoNumber, payload.url);
         break;
 
       case 'capture:error':
@@ -340,6 +344,33 @@
     img.src = url;
     img.alt = 'Photo';
     thumbnailStrip.appendChild(img);
+    thumbnailStrip.scrollLeft = thumbnailStrip.scrollWidth;
+  }
+
+  function addThumbnailPlaceholder(photoNumber) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'thumbnail thumbnail-loading';
+    wrapper.dataset.photoNumber = photoNumber;
+
+    const spinner = document.createElement('div');
+    spinner.className = 'thumbnail-spinner';
+    wrapper.appendChild(spinner);
+
+    thumbnailStrip.appendChild(wrapper);
+    thumbnailStrip.scrollLeft = thumbnailStrip.scrollWidth;
+  }
+
+  function replaceThumbnailPlaceholder(photoNumber, url) {
+    const placeholder = thumbnailStrip.querySelector(`[data-photo-number="${photoNumber}"]`);
+    if (placeholder) {
+      const img = document.createElement('img');
+      img.className = 'thumbnail';
+      img.src = url;
+      img.alt = 'Photo';
+      placeholder.replaceWith(img);
+    } else {
+      addThumbnail(url);
+    }
     thumbnailStrip.scrollLeft = thumbnailStrip.scrollWidth;
   }
 

@@ -90,24 +90,27 @@ wss.on('connection', (ws) => {
             break;
           }
 
-          stopAutofocusLoop();
-          try {
-            const photoNum = active.photoCount + 1;
-            const result = await camera.captureAndDownload(active.dir, photoNum);
-            session.addPhoto(result.filename);
+          const photoNum = active.photoCount + 1;
 
-            // Send back the photo info for thumbnail
+          // Capture + download — onCaptured fires right after shutter,
+          // download continues in background after that
+          stopAutofocusLoop();
+          camera.captureAndDownload(active.dir, photoNum, () => {
+            // Shutter has fired — notify client immediately
+            send(ws, 'capture:captured', { photoNumber: photoNum });
+          }).then((result) => {
+            session.addPhoto(result.filename);
             send(ws, 'capture:complete', {
               filename: result.filename,
               photoNumber: photoNum,
               url: `/sessions/${active.id}/${result.filename}`
             });
             startAutofocusLoop();
-          } catch (err) {
+          }).catch((err) => {
             console.error('[capture] Error:', err.message);
             send(ws, 'capture:error', { message: err.message });
             startAutofocusLoop();
-          }
+          });
           break;
         }
 

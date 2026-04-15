@@ -64,7 +64,7 @@ async function applySettings() {
   console.log('[camera] Settings applied');
 }
 
-async function captureAndDownload(destDir, photoNumber) {
+async function captureAndDownload(destDir, photoNumber, onCaptured) {
   const filename = `IMG_${String(photoNumber).padStart(3, '0')}.jpg`;
   const destPath = path.join(destDir, filename);
 
@@ -85,6 +85,9 @@ async function captureAndDownload(destDir, photoNumber) {
   // Capture image — files stay on the camera SD card
   const output = await gphoto2(['--capture-image'], 15000);
   console.log('[camera] Capture output:', output);
+
+  // Notify caller that the shutter fired (before download begins)
+  if (typeof onCaptured === 'function') onCaptured();
 
   // Parse the JPEG path from gphoto2 output
   // Output lines look like: "New file is in location /store_00010001/DCIM/104NZ6_3/DSC_1124.JPG on the camera"
