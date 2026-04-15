@@ -19,8 +19,8 @@ function start() {
     '-video_size', `${cfg.width}x${cfg.height}`,
     '-framerate', String(cfg.fps),
     '-i', cfg.device,
+    '-c:v', 'copy',
     '-f', 'mjpeg',
-    '-q:v', '5',
     '-an',
     'pipe:1'
   ];
