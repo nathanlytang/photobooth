@@ -21,6 +21,7 @@
   const screenCountdown = document.getElementById('screen-countdown');
   const screenContact = document.getElementById('screen-contact');
   const screenProcessing = document.getElementById('screen-processing');
+  const screenSuccess = document.getElementById('screen-success');
   const flashOverlay = document.getElementById('flash-overlay');
   const countdownNumber = document.getElementById('countdown-number');
   const thumbnailStrip = document.getElementById('thumbnail-strip');
@@ -179,6 +180,8 @@
 
       case 'session:ended':
         showScreen('idle');
+        showOverlay(screenSuccess);
+        setTimeout(() => hideOverlay(screenSuccess), 3000);
         break;
 
       case 'error':
