@@ -2,13 +2,26 @@ const { execFile } = require('child_process');
 const path = require('path');
 const config = require('./config');
 
-// gphoto2 config name mappings
-const SETTING_MAP = {
+// gphoto2 config path for each known camera setting
+const ALL_SETTINGS = {
   iso: '/main/imgsettings/iso',
   shutterSpeed: '/main/capturesettings/shutterspeed',
   aperture: '/main/capturesettings/f-number',
   whiteBalance: '/main/imgsettings/whitebalance',
+  pictureProfile: '/main/capturesettings/picturestyle',
 };
+
+// Build map from only the settings present in config.json
+function buildSettingMap() {
+  const cam = config.get().camera || {};
+  const map = {};
+  for (const [key, path] of Object.entries(ALL_SETTINGS)) {
+    if (cam[key] !== undefined) {
+      map[key] = path;
+    }
+  }
+  return map;
+}
 
 // Mutex to serialize all USB access — prevents "Could not claim the USB device"
 let usbLock = Promise.resolve();
@@ -36,16 +49,15 @@ function gphoto2(args, timeout = 30000) {
 
 async function applySettings() {
   const cam = config.get().camera;
+  const settingMap = buildSettingMap();
   console.log('[camera] Applying camera settings...');
 
-  for (const [key, configPath] of Object.entries(SETTING_MAP)) {
-    if (cam[key] !== undefined) {
-      try {
-        await gphoto2(['--set-config', `${configPath}=${cam[key]}`]);
-        console.log(`[camera]   ${key} = ${cam[key]}`);
-      } catch (err) {
-        console.warn(`[camera]   Failed to set ${key}: ${err.message}`);
-      }
+  for (const [key, configPath] of Object.entries(settingMap)) {
+    try {
+      await gphoto2(['--set-config', `${configPath}=${cam[key]}`]);
+      console.log(`[camera]   ${key} = ${cam[key]}`);
+    } catch (err) {
+      console.warn(`[camera]   Failed to set ${key}: ${err.message}`);
     }
   }
 
