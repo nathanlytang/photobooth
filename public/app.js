@@ -13,6 +13,7 @@
   let enableEmail = true;
   let enablePhone = true;
   let cropConfig = null;
+  let shutterOffsetMs = 0;
 
   // --- DOM Elements ---
   const previewCanvas = document.getElementById('preview-canvas');
@@ -57,6 +58,7 @@
       if (cfg.crop && cfg.crop.enabled) {
         cropConfig = cfg.crop;
       }
+      shutterOffsetMs = cfg.shutterOffsetMs || 0;
     } catch (err) {
       console.warn('Could not fetch config, using defaults');
     }
@@ -324,9 +326,19 @@
   // --- Countdown ---
   function startCountdown(seconds) {
     let remaining = seconds;
+    let triggerSent = false;
     countdownNumber.textContent = remaining;
     showOverlay(screenCountdown);
     LookIndicator.startPulsing();
+
+    // Schedule the capture trigger with offset applied.
+    // Positive offset = trigger sooner (before countdown ends),
+    // negative offset = trigger later (after countdown ends).
+    const triggerDelayMs = (seconds * 1000) - shutterOffsetMs;
+    const triggerTimeout = setTimeout(() => {
+      triggerSent = true;
+      wsSend('capture:trigger');
+    }, triggerDelayMs);
 
     clearInterval(countdownTimer);
     countdownTimer = setInterval(() => {
@@ -339,7 +351,6 @@
         LookIndicator.stopPulsing();
         hideOverlay(screenCountdown);
         showOverlay(screenProcessing);
-        wsSend('capture:trigger');
       }
     }, 1000);
   }

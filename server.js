@@ -35,7 +35,8 @@ app.get('/api/config', (req, res) => {
     enableEmail: cfg.app.enableEmail !== false,
     enablePhone: cfg.app.enablePhone !== false,
     mode: cfg.app.mode || 'prod',
-    crop: cfg.preview.crop || null
+    crop: cfg.preview.crop || null,
+    shutterOffsetMs: cfg.app.shutterOffsetMs || 0
   });
 });
 
