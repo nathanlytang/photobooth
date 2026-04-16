@@ -12,9 +12,11 @@
   let activeInput = null;
   let enableEmail = true;
   let enablePhone = true;
+  let cropConfig = null;
 
   // --- DOM Elements ---
-  const previewImg = document.getElementById('preview');
+  const previewCanvas = document.getElementById('preview-canvas');
+  const previewCtx = previewCanvas.getContext('2d');
   const noSignal = document.getElementById('no-signal');
   const screenIdle = document.getElementById('screen-idle');
   const screenSession = document.getElementById('screen-session');
@@ -52,6 +54,9 @@
       enableEmail = cfg.enableEmail !== false;
       enablePhone = cfg.enablePhone !== false;
       appMode = cfg.mode || 'prod';
+      if (cfg.crop && cfg.crop.enabled) {
+        cropConfig = cfg.crop;
+      }
     } catch (err) {
       console.warn('Could not fetch config, using defaults');
     }
@@ -125,15 +130,27 @@
       const blob = new Blob([jpegData], { type: 'image/jpeg' });
       const url = URL.createObjectURL(blob);
 
-      const oldSrc = previewImg.src;
-      previewImg.src = url;
-
-      if (oldSrc && oldSrc.startsWith('blob:')) {
-        URL.revokeObjectURL(oldSrc);
-      }
-
       noSignal.classList.add('hidden');
-      previewImg.classList.add('has-feed');
+
+      // Draw frame (cropped or full) onto canvas
+      const img = new Image();
+      img.onload = () => {
+        if (cropConfig) {
+          if (previewCanvas.width !== cropConfig.width) previewCanvas.width = cropConfig.width;
+          if (previewCanvas.height !== cropConfig.height) previewCanvas.height = cropConfig.height;
+          previewCtx.drawImage(
+            img,
+            cropConfig.x, cropConfig.y, cropConfig.width, cropConfig.height,
+            0, 0, cropConfig.width, cropConfig.height
+          );
+        } else {
+          if (previewCanvas.width !== img.naturalWidth) previewCanvas.width = img.naturalWidth;
+          if (previewCanvas.height !== img.naturalHeight) previewCanvas.height = img.naturalHeight;
+          previewCtx.drawImage(img, 0, 0);
+        }
+        URL.revokeObjectURL(url);
+      };
+      img.src = url;
     }
   }
 

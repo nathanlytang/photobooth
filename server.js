@@ -34,7 +34,8 @@ app.get('/api/config', (req, res) => {
     lookText: cfg.app.lookText || 'Look up here!',
     enableEmail: cfg.app.enableEmail !== false,
     enablePhone: cfg.app.enablePhone !== false,
-    mode: cfg.app.mode || 'prod'
+    mode: cfg.app.mode || 'prod',
+    crop: cfg.preview.crop || null
   });
 });
 

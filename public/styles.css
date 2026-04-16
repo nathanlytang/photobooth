@@ -17,11 +17,6 @@ html, body {
 /* Mirror the live preview */
 .mirror {
   transform: scaleX(-1);
-  display: none;
-}
-
-.mirror.has-feed {
-  display: block;
 }
 
 #no-signal.hidden {
