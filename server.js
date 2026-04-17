@@ -182,6 +182,7 @@ function shutdown() {
 }
 
 function startAutofocusLoop() {
+  if (cfg.app.periodicAutofocus === false) return;
   stopAutofocusLoop();
   autofocusInterval = setInterval(() => {
     if (session.getActive()) {

@@ -21,6 +21,7 @@
     "lookText": "Look here!",
     "enableEmail": true,
     "enablePhone": false,
-    "mode": "dev"
+    "mode": "dev",
+    "periodicAutofocus": true
   }
 }
