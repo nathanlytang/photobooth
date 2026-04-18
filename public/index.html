@@ -40,7 +40,7 @@
     <!-- Screen 2: Session Active -->
     <div id="screen-session" class="screen">
       <div class="flex justify-end p-6">
-        <button id="btn-end-session" class="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-black/50 backdrop-blur-lg px-10 py-5 text-2xl font-semibold text-white shadow-lg transition-colors hover:bg-black/70">
+        <button id="btn-end-session" class="end-session-btn glass-panel inline-flex items-center gap-2 rounded-xl font-semibold text-white transition-colors hover:bg-black/70">
           End Session
         </button>
       </div>
@@ -54,7 +54,7 @@
 
     <!-- Screen 3: Countdown Overlay -->
     <div id="screen-countdown" class="overlay">
-      <div id="countdown-number" class="text-[180px] font-black text-white countdown-pulse" style="text-shadow: 0 0 60px rgba(0,0,0,0.7);"></div>
+      <div id="countdown-number" class="countdown-number font-black text-white countdown-pulse" style="text-shadow: 0 0 60px rgba(0,0,0,0.7);"></div>
     </div>
 
     <!-- Flash Overlay -->
@@ -65,25 +65,25 @@
       <div class="flex flex-col h-full">
         <!-- Top section: form card -->
         <div class="flex-1 flex items-center justify-center pt-6 pb-2">
-          <div class="w-full max-w-2xl rounded-xl border border-border bg-card/90 backdrop-blur-xl p-10 shadow-2xl space-y-6">
+          <div class="contact-card w-full max-w-2xl rounded-xl border border-border bg-card/90 backdrop-blur-xl shadow-2xl space-y-6">
             <div class="text-center space-y-1.5">
-              <h2 class="text-4xl font-bold tracking-tight">Session Complete</h2>
+              <h2 class="contact-heading font-bold tracking-tight">Session Complete</h2>
               <p id="photo-count-msg" class="text-xl text-muted-foreground"></p>
             </div>
             <div class="space-y-3">
               <div id="group-email" class="space-y-1.5">
                 <label for="input-email" class="text-lg font-medium text-muted-foreground">Email</label>
                 <input type="text" id="input-email" readonly placeholder="your@email.com"
-                  class="flex h-16 w-full rounded-lg border border-input bg-background px-5 text-2xl text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all">
+                  class="contact-input flex w-full rounded-lg border border-input bg-background px-5 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all">
               </div>
               <div id="group-phone" class="space-y-1.5">
                 <label for="input-phone" class="text-lg font-medium text-muted-foreground">Phone</label>
                 <input type="text" id="input-phone" readonly placeholder="(555) 123-4567"
-                  class="flex h-16 w-full rounded-lg border border-input bg-background px-5 text-2xl text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all">
+                  class="contact-input flex w-full rounded-lg border border-input bg-background px-5 text-foreground placeholder:text-muted-foreground/40 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:ring-offset-background transition-all">
               </div>
             </div>
             <p id="form-hint" class="text-base text-center text-muted-foreground">Enter your email and/or phone number to receive your photos.</p>
-            <button id="btn-submit" class="btn-primary-action w-full text-2xl">
+            <button id="btn-submit" class="btn-primary-action w-full">
               Submit &amp; Finish
             </button>
           </div>
@@ -103,12 +103,12 @@
 
     <!-- Success confirmation overlay -->
     <div id="screen-success" class="overlay">
-      <div class="flex flex-col items-center gap-4 text-center px-8">
-        <svg class="w-20 h-20 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+      <div class="success-card glass-panel flex flex-col items-center text-center">
+        <svg class="success-icon text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
           <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/>
         </svg>
-        <h2 class="text-4xl font-bold text-white">Success!</h2>
-        <p class="text-2xl text-white/80">Your photos will be sent to you soon.</p>
+        <h2 class="success-heading font-bold text-white">Success!</h2>
+        <p class="success-text text-white/80">Your photos will be sent to you soon.</p>
       </div>
     </div>
   </div>
