@@ -1,0 +1,35 @@
+{
+  "camera": {
+    "iso": "800",
+    "shutterSpeed": "1/125",
+    "aperture": "5.6",
+    "whiteBalance": "auto",
+    "pictureProfile": "standard",
+    "captureTarget": "card"
+  },
+  "preview": {
+    "device": "/dev/video0",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "crop": {
+      "enabled": false,
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    }
+  },
+  "app": {
+    "port": 3000,
+    "sessionsDir": "./sessions",
+    "countdownSeconds": 10,
+    "shutterOffsetMs": 0,
+    "cameraPosition": "above",
+    "lookText": "Look here!",
+    "enableEmail": true,
+    "enablePhone": false,
+    "mode": "dev",
+    "periodicAutofocus": false
+  }
+}

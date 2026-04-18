@@ -16,12 +16,17 @@ Photobooth application with HDMI capture live preview and gphoto2 camera control
 # Install dependencies
 npm install
 
+# Create your config file from the example
+cp config.example.json config.json
+
 # Edit camera and app settings
 nano config.json
 
 # Start the server
 npm start
 ```
+
+> **Note:** `config.json` must exist before the server will start. See `config.example.json` for the default template.
 
 The web UI will be available at `http://localhost:3000`.
 
@@ -71,14 +76,21 @@ Edit `config.json` to adjust camera and app settings:
 | `preview.width` | Preview resolution width |
 | `preview.height` | Preview resolution height |
 | `preview.fps` | Preview frame rate |
+| `preview.crop.enabled` | Enable cropping of preview feed (true/false) |
+| `preview.crop.x` | Crop region X offset in pixels |
+| `preview.crop.y` | Crop region Y offset in pixels |
+| `preview.crop.width` | Crop region width in pixels |
+| `preview.crop.height` | Crop region height in pixels |
 | `app.port` | Web server port |
 | `app.sessionsDir` | Directory for session folders |
 | `app.countdownSeconds` | Countdown before capture |
+| `app.shutterOffsetMs` | Delay in ms between countdown end and shutter trigger |
 | `app.cameraPosition` | Camera relative to display: "above" or "below" |
 | `app.lookText` | Text shown with arrow pointing at camera |
 | `app.enableEmail` | Show email input on contact form (true/false) |
 | `app.enablePhone` | Show phone input on contact form (true/false) |
 | `app.mode` | "dev" or "prod" — dev allows F5/F11/F12/Ctrl+R/Ctrl+Shift+I and right-click |
+| `app.periodicAutofocus` | Trigger autofocus every 5s during active session (true/false) |
 
 ## Session Structure
 

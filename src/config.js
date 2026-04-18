@@ -6,6 +6,13 @@ const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
 let config = null;
 
 function load() {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    console.error('[config] config.json not found.');
+    console.error('[config] Copy the example config to get started:');
+    console.error('[config]   cp config.example.json config.json');
+    process.exit(1);
+  }
+
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
     config = JSON.parse(raw);
