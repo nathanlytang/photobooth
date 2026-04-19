@@ -1,0 +1,163 @@
+const fs = require('fs');
+const path = require('path');
+const http = require('http');
+const https = require('https');
+const config = require('./config');
+
+function isEnabled() {
+  const gs = config.get().app.galleryServer;
+  return gs && gs.enabled;
+}
+
+function getGalleryConfig() {
+  return config.get().app.galleryServer;
+}
+
+function request(method, urlPath, body, contentType) {
+  return new Promise((resolve, reject) => {
+    const gs = getGalleryConfig();
+    const base = new URL(gs.baseUrl);
+    const isHttps = base.protocol === 'https:';
+    const mod = isHttps ? https : http;
+
+    const options = {
+      hostname: base.hostname,
+      port: base.port || (isHttps ? 443 : 80),
+      path: urlPath,
+      method,
+      headers: {
+        'Authorization': `Bearer ${gs.authToken}`,
+      },
+      timeout: 30000,
+    };
+
+    if (contentType) {
+      options.headers['Content-Type'] = contentType;
+    }
+
+    const req = mod.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve(data);
+          }
+        } else {
+          reject(new Error(`Gallery server responded with ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Gallery server request timed out'));
+    });
+
+    if (body) {
+      req.write(typeof body === 'string' ? body : JSON.stringify(body));
+    }
+    req.end();
+  });
+}
+
+async function createShare(shareId) {
+  if (!isEnabled()) return null;
+
+  try {
+    const gs = getGalleryConfig();
+    const body = {};
+    if (shareId) {
+      body.shareId = shareId;
+    }
+    if (gs.resize !== undefined) {
+      body.resize = gs.resize;
+    }
+    const result = await request('POST', '/api/shares', body, 'application/json');
+    console.log(`[gallery] Created share: ${result.shareId} -> ${result.shareUrl}`);
+    return result;
+  } catch (err) {
+    console.log(err);
+    console.error('[gallery] Failed to create share:', err.message);
+    return null;
+  }
+}
+
+async function uploadPhoto(shareId, filePath) {
+  if (!isEnabled() || !shareId) return;
+
+  try {
+    const gs = getGalleryConfig();
+    const base = new URL(gs.baseUrl);
+    const isHttps = base.protocol === 'https:';
+    const mod = isHttps ? https : http;
+
+    const filename = path.basename(filePath);
+    const fileData = fs.readFileSync(filePath);
+    const boundary = '----PhotoboothUpload' + Date.now();
+
+    const header = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="photo"; filename="${filename}"\r\n` +
+      `Content-Type: image/jpeg\r\n\r\n`
+    );
+    const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const body = Buffer.concat([header, fileData, footer]);
+
+    const options = {
+      hostname: base.hostname,
+      port: base.port || (isHttps ? 443 : 80),
+      path: `/api/shares/${shareId}/photos`,
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${gs.authToken}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+      timeout: 60000,
+    };
+
+    await new Promise((resolve, reject) => {
+      const req = mod.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => { data += chunk; });
+        res.on('end', () => {
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve(data);
+          } else {
+            reject(new Error(`Upload failed with ${res.statusCode}: ${data}`));
+          }
+        });
+      });
+
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Photo upload timed out'));
+      });
+
+      req.write(body);
+      req.end();
+    });
+
+    console.log(`[gallery] Uploaded photo ${filename} to share ${shareId}`);
+  } catch (err) {
+    console.error(`[gallery] Failed to upload photo:`, err.message);
+  }
+}
+
+async function uploadMetadata(shareId, metadata) {
+  if (!isEnabled() || !shareId) return;
+
+  try {
+    await request('PUT', `/api/shares/${shareId}/metadata`, metadata, 'application/json');
+    console.log(`[gallery] Uploaded metadata to share ${shareId}`);
+  } catch (err) {
+    console.error('[gallery] Failed to upload metadata:', err.message);
+  }
+}
+
+module.exports = { isEnabled, createShare, uploadPhoto, uploadMetadata };

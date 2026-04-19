@@ -30,6 +30,21 @@
     "enableEmail": true,
     "enablePhone": false,
     "mode": "dev",
-    "periodicAutofocus": false
+    "eventName": "",
+    "generateShareId": false,
+    "periodicAutofocus": false,
+    "galleryServer": {
+      "enabled": false,
+      "baseUrl": "http://localhost:4000",
+      "authToken": "change-me-to-a-secure-random-token",
+      "resize": {
+        "enabled": false,
+        "mode": "preset",
+        "preset": "socialMedia",
+        "longEdge": 1920,
+        "percentage": 50,
+        "quality": 85
+      }
+    }
   }
 }

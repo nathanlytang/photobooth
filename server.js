@@ -8,6 +8,7 @@ const config = require('./src/config');
 const preview = require('./src/preview');
 const camera = require('./src/camera');
 const session = require('./src/session');
+const gallery = require('./src/gallery');
 
 // Load configuration
 const cfg = config.load();
@@ -23,11 +24,15 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Serve vendor libraries from node_modules
+app.use('/vendor/qrcode.js', express.static(path.join(__dirname, 'node_modules/qrcode-generator/dist/qrcode.js')));
+
 // Serve session photos for thumbnail display
 app.use('/sessions', express.static(sessionsDir));
 
 // REST endpoint to get current config (non-sensitive, for frontend countdown value etc.)
 app.get('/api/config', (req, res) => {
+  const gs = cfg.app.galleryServer;
   res.json({
     countdownSeconds: cfg.app.countdownSeconds,
     cameraPosition: cfg.app.cameraPosition || 'above',
@@ -36,7 +41,8 @@ app.get('/api/config', (req, res) => {
     enablePhone: cfg.app.enablePhone !== false,
     mode: cfg.app.mode || 'prod',
     crop: cfg.preview.crop || null,
-    shutterOffsetMs: cfg.app.shutterOffsetMs || 0
+    shutterOffsetMs: cfg.app.shutterOffsetMs || 0,
+    galleryEnabled: !!(gs && gs.enabled)
   });
 });
 
@@ -68,6 +74,17 @@ wss.on('connection', (ws) => {
           const result = session.start();
           send(ws, 'session:started', result);
           startAutofocusLoop();
+
+          // Create a gallery share in the background
+          if (gallery.isEnabled()) {
+            const active = session.getActive();
+            gallery.createShare(active?.shareId).then((share) => {
+              if (share) {
+                session.setShare(share.shareId, share.shareUrl);
+                console.log(`[server] Gallery share linked: ${share.shareUrl}`);
+              }
+            });
+          }
           break;
         }
 
@@ -108,6 +125,11 @@ wss.on('connection', (ws) => {
               url: `/sessions/${active.id}/${result.filename}`
             });
             startAutofocusLoop();
+
+            // Upload photo to gallery server in the background
+            if (gallery.isEnabled() && active.shareId) {
+              gallery.uploadPhoto(active.shareId, result.path).catch(() => {});
+            }
           }).catch((err) => {
             console.error('[capture] Error:', err.message);
             send(ws, 'capture:error', { message: err.message });
@@ -122,6 +144,11 @@ wss.on('connection', (ws) => {
           try {
             const result = session.end(contactInfo);
             send(ws, 'session:ended', result);
+
+            // Upload metadata to gallery server in the background
+            if (gallery.isEnabled() && result.shareId) {
+              gallery.uploadMetadata(result.shareId, result.metadata).catch(() => {});
+            }
           } catch (err) {
             send(ws, 'error', { message: err.message });
           }

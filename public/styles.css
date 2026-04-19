@@ -330,6 +330,37 @@ html, body {
   display: flex;
 }
 
+/* Share screen */
+#screen-share {
+  z-index: 70;
+  background: rgba(0, 0, 0, 0.88);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  pointer-events: auto;
+}
+
+#screen-share.active {
+  display: flex;
+}
+
+.share-card {
+  padding: 2.5rem;
+}
+
+.share-heading {
+  font-size: 2.25rem;
+}
+
+.share-check-icon {
+  width: 4rem;
+  height: 4rem;
+}
+
+#share-qr-canvas {
+  width: 280px;
+  height: 280px;
+}
+
 /* Processing overlay */
 #screen-processing {
   background: rgba(0, 0, 0, 0.5);
@@ -554,6 +585,24 @@ html, body {
   .look-indicator.position-below {
     bottom: 100px;
   }
+
+  .share-card {
+    padding: 1.5rem;
+  }
+
+  .share-heading {
+    font-size: 1.75rem;
+  }
+
+  .share-check-icon {
+    width: 3rem;
+    height: 3rem;
+  }
+
+  #share-qr-canvas {
+    width: 220px;
+    height: 220px;
+  }
 }
 
 /* ========================================
@@ -665,5 +714,23 @@ html, body {
 
   .look-indicator.position-below {
     bottom: 80px;
+  }
+
+  .share-card {
+    padding: 1.25rem;
+  }
+
+  .share-heading {
+    font-size: 1.5rem;
+  }
+
+  .share-check-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  #share-qr-canvas {
+    width: 180px;
+    height: 180px;
   }
 }

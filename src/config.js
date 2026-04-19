@@ -50,6 +50,13 @@ function validate(cfg) {
       throw new Error(`Missing app.${key} in config`);
     }
   }
+
+  // Validate galleryServer if enabled
+  if (cfg.app.galleryServer && cfg.app.galleryServer.enabled) {
+    const gs = cfg.app.galleryServer;
+    if (!gs.baseUrl) throw new Error('Missing galleryServer.baseUrl in config');
+    if (!gs.authToken) throw new Error('Missing galleryServer.authToken in config');
+  }
 }
 
 function get() {

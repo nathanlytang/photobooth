@@ -1,7 +1,7 @@
 (function () {
   'use strict';
 
-  const { Kiosk, Keyboard, Validation, LookIndicator } = window.Photobooth;
+  const { Kiosk, Keyboard, Validation, LookIndicator, QRCode } = window.Photobooth;
 
   // --- State ---
   let ws = null;
@@ -14,6 +14,9 @@
   let enablePhone = true;
   let cropConfig = null;
   let shutterOffsetMs = 0;
+  let galleryEnabled = false;
+  let pendingShareUrl = null;
+  let sessionPhotoCount = 0;
 
   // --- DOM Elements ---
   const previewCanvas = document.getElementById('preview-canvas');
@@ -25,6 +28,11 @@
   const screenContact = document.getElementById('screen-contact');
   const screenProcessing = document.getElementById('screen-processing');
   const screenSuccess = document.getElementById('screen-success');
+  const screenShare = document.getElementById('screen-share');
+  const shareQrCanvas = document.getElementById('share-qr-canvas');
+  const shareUrlText = document.getElementById('share-url-text');
+  const sharePhotoCount = document.getElementById('share-photo-count');
+  const btnShareDone = document.getElementById('btn-share-done');
   const flashOverlay = document.getElementById('flash-overlay');
   const countdownNumber = document.getElementById('countdown-number');
   const thumbnailStrip = document.getElementById('thumbnail-strip');
@@ -59,6 +67,7 @@
         cropConfig = cfg.crop;
       }
       shutterOffsetMs = cfg.shutterOffsetMs || 0;
+      galleryEnabled = !!cfg.galleryEnabled;
     } catch (err) {
       console.warn('Could not fetch config, using defaults');
     }
@@ -202,9 +211,9 @@
         break;
 
       case 'session:ended':
-        showScreen('idle');
-        showOverlay(screenSuccess);
-        setTimeout(() => hideOverlay(screenSuccess), 3000);
+        pendingShareUrl = payload.shareUrl || null;
+        sessionPhotoCount = (payload.metadata && payload.metadata.photoCount) || 0;
+        handleSessionEnded();
         break;
 
       case 'error':
@@ -238,12 +247,29 @@
 
     btnEndSession.addEventListener('click', () => {
       const count = thumbnailStrip.children.length;
-      photoCountMsg.textContent = `You took ${count} photo${count !== 1 ? 's' : ''}!`;
-      inputEmail.value = '';
-      inputPhone.value = '';
-      activeInput = enableEmail ? inputEmail : (enablePhone ? inputPhone : null);
-      highlightActiveInput();
-      showScreen('contact');
+      sessionPhotoCount = count;
+      const hasContactForm = enableEmail || enablePhone;
+
+      if (hasContactForm) {
+        // Show contact form
+        photoCountMsg.textContent = `You took ${count} photo${count !== 1 ? 's' : ''}!`;
+        inputEmail.value = '';
+        inputPhone.value = '';
+        activeInput = enableEmail ? inputEmail : (enablePhone ? inputPhone : null);
+        highlightActiveInput();
+
+        // Change button text based on whether gallery share screen follows
+        if (galleryEnabled) {
+          btnSubmit.textContent = 'Submit';
+        } else {
+          btnSubmit.innerHTML = 'Submit &amp; Finish';
+        }
+
+        showScreen('contact');
+      } else {
+        // No contact form — send session:end immediately with empty contact
+        wsSend('session:end', { email: '', phone: '' });
+      }
     });
 
     btnSubmit.addEventListener('click', () => {
@@ -284,6 +310,10 @@
       wsSend('session:end', { email, phone });
     });
 
+    btnShareDone.addEventListener('click', () => {
+      showScreen('idle');
+    });
+
     inputEmail.addEventListener('click', () => {
       activeInput = inputEmail;
       highlightActiveInput();
@@ -307,12 +337,45 @@
     screenIdle.classList.toggle('active', name === 'idle');
     screenSession.classList.toggle('active', name === 'session');
     screenContact.classList.toggle('active', name === 'contact');
+    screenShare.classList.toggle('active', name === 'share');
 
     if (name === 'session') {
       LookIndicator.show();
     } else {
       LookIndicator.hide();
     }
+  }
+
+  // --- Session Ended Flow ---
+  function handleSessionEnded() {
+    const hasContactForm = enableEmail || enablePhone;
+
+    if (hasContactForm && galleryEnabled && pendingShareUrl) {
+      // Contact form was shown, now transition to share screen
+      showShareScreen();
+    } else if (!hasContactForm && galleryEnabled && pendingShareUrl) {
+      // No contact form, go straight to share screen
+      showShareScreen();
+    } else {
+      // No gallery — show brief success overlay and return to idle
+      showScreen('idle');
+      showOverlay(screenSuccess);
+      setTimeout(() => hideOverlay(screenSuccess), 3000);
+    }
+  }
+
+  function showShareScreen() {
+    const count = sessionPhotoCount;
+    sharePhotoCount.textContent = `${count} photo${count !== 1 ? 's' : ''} ready to view`;
+    shareUrlText.textContent = pendingShareUrl.replace(/^https?:\/\//, '');
+
+    try {
+      QRCode.render(shareQrCanvas, pendingShareUrl, 560);
+    } catch (err) {
+      console.error('[qr] Failed to render QR code:', err);
+    }
+
+    showScreen('share');
   }
 
   function showOverlay(el) {
