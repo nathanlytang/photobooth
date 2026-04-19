@@ -1,3 +1,44 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("/fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+    U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191,
+    U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@theme {
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-border: hsl(240 3.7% 15.9%);
+  --color-input: hsl(240 3.7% 15.9%);
+  --color-ring: hsl(240 4.9% 83.9%);
+  --color-background: hsl(240 10% 3.9%);
+  --color-foreground: hsl(0 0% 98%);
+
+  --color-primary: hsl(0 0% 98%);
+  --color-primary-foreground: hsl(240 5.9% 10%);
+
+  --color-secondary: hsl(240 3.7% 15.9%);
+  --color-secondary-foreground: hsl(0 0% 98%);
+
+  --color-muted: hsl(240 3.7% 15.9%);
+  --color-muted-foreground: hsl(240 5% 64.9%);
+
+  --color-accent: hsl(240 3.7% 15.9%);
+  --color-accent-foreground: hsl(0 0% 98%);
+
+  --color-destructive: hsl(0 62.8% 30.6%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-card: hsl(240 10% 3.9%);
+  --color-card-foreground: hsl(0 0% 98%);
+}
+
 /* Base */
 html, body {
   width: 100%;
@@ -9,7 +50,7 @@ html, body {
   user-select: none;
 }
 
-#app {
+#root {
   width: 100%;
   height: 100%;
 }
@@ -17,10 +58,6 @@ html, body {
 /* Mirror the live preview */
 .mirror {
   transform: scaleX(-1);
-}
-
-#no-signal.hidden {
-  display: none !important;
 }
 
 /* "Look here" camera indicator */
@@ -273,7 +310,7 @@ html, body {
 }
 
 /* Contact screen */
-#screen-contact {
+.screen-contact {
   z-index: 70;
   background: rgba(0, 0, 0, 0.88);
   backdrop-filter: blur(24px);
@@ -326,12 +363,12 @@ html, body {
   font-size: 1.5rem;
 }
 
-#screen-contact.active {
+.screen-contact.active {
   display: flex;
 }
 
 /* Share screen */
-#screen-share {
+.screen-share {
   z-index: 70;
   background: rgba(0, 0, 0, 0.88);
   backdrop-filter: blur(24px);
@@ -339,7 +376,7 @@ html, body {
   pointer-events: auto;
 }
 
-#screen-share.active {
+.screen-share.active {
   display: flex;
 }
 
@@ -356,13 +393,13 @@ html, body {
   height: 4rem;
 }
 
-#share-qr-canvas {
+.share-qr-canvas {
   width: 280px;
   height: 280px;
 }
 
 /* Processing overlay */
-#screen-processing {
+.screen-processing {
   background: rgba(0, 0, 0, 0.5);
   z-index: 55;
 }
@@ -408,9 +445,7 @@ html, body {
   pointer-events: auto;
 }
 
-/* ========================================
-   On-Screen Keyboard
-   ======================================== */
+/* On-Screen Keyboard */
 .keyboard-container {
   padding: 10px 16px 16px;
   background: hsl(240 6% 6%);
@@ -599,7 +634,7 @@ html, body {
     height: 3rem;
   }
 
-  #share-qr-canvas {
+  .share-qr-canvas {
     width: 220px;
     height: 220px;
   }
@@ -729,7 +764,7 @@ html, body {
     height: 2.5rem;
   }
 
-  #share-qr-canvas {
+  .share-qr-canvas {
     width: 180px;
     height: 180px;
   }
