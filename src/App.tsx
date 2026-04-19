@@ -118,6 +118,14 @@ export default function App() {
   const handleEndSession = useCallback(() => {
     const count = state.thumbnails.length;
     state.setSessionPhotoCount(count);
+
+    // No photos taken — skip contact/share, just end and return to idle
+    if (count === 0) {
+      wsSend('session:end', { email: '', phone: '' });
+      state.showScreen('idle');
+      return;
+    }
+
     const hasContactForm = state.config.enableEmail || state.config.enablePhone;
 
     if (hasContactForm) {
