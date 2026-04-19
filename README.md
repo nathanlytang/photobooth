@@ -5,6 +5,7 @@ Photobooth application with HDMI capture live preview and gphoto2 camera control
 ## Requirements
 
 - **Node.js** 18+
+- **pnpm** 9+ (`corepack enable` or `npm install -g pnpm`)
 - **gphoto2**: `sudo apt install gphoto2`
 - **ffmpeg**: `sudo apt install ffmpeg`
 - **USB HDMI Capture Card** (UVC-compatible, e.g. MS2109 chipset)
@@ -14,16 +15,52 @@ Photobooth application with HDMI capture live preview and gphoto2 camera control
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Create your config file from the example
 cp config.example.json config.json
 
 # Edit camera and app settings
 nano config.json
+```
 
-# Start the server
-npm start
+## Development
+
+```bash
+# Run both frontend (Vite) and backend (tsx) in watch mode
+pnpm dev
+
+# Or run them separately
+pnpm dev:server   # Backend only (tsx watch)
+pnpm dev:client   # Frontend only (Vite HMR)
+```
+
+## Production
+
+```bash
+# Build the frontend
+pnpm build
+
+# Start the production server (serves built frontend + API + WebSocket)
+pnpm start
+```
+
+Using `pm2`:
+
+```bash
+# Build frontend
+pnpm build
+
+# Start with pm2
+pm2 start ecosystem.config.cjs
+
+# Enable auto-start on boot
+pm2 save && pm2 startup
+
+# Install log rotation
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 5
 ```
 
 > **Note:** `config.json` must exist before the server will start. See `config.example.json` for the default template.
