@@ -1,16 +1,26 @@
-const fs = require('fs');
-const path = require('path');
-const { nanoid } = require('nanoid');
-const config = require('./config');
+import fs from 'fs';
+import path from 'path';
+import { customAlphabet } from 'nanoid';
 
-let currentSession = null;
+const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
+import * as config from './config.js';
+import type {
+  Session,
+  SessionStartResult,
+  SessionEndResult,
+  SessionMetadata,
+  ContactInfo,
+  PhotoRecord,
+} from './types.js';
 
-function formatTimestamp(date) {
-  const pad = (n) => String(n).padStart(2, '0');
+let currentSession: Session | null = null;
+
+function formatTimestamp(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`;
 }
 
-function start() {
+export function start(): SessionStartResult {
   if (currentSession) {
     console.log(`[session] Resuming existing session: ${currentSession.id}`);
     return { id: currentSession.id, resumed: true, photos: currentSession.photos };
@@ -23,9 +33,9 @@ function start() {
   fs.mkdirSync(sessionDir, { recursive: true });
 
   // Generate a local share ID if configured (works even if gallery server is offline)
-  const gs = cfg.galleryServer || {};
-  let localShareId = null;
-  let localShareUrl = null;
+  const gs = cfg.galleryServer || ({} as { baseUrl?: string });
+  let localShareId: string | null = null;
+  let localShareUrl: string | null = null;
   if (cfg.generateShareId) {
     localShareId = nanoid(6);
     localShareUrl = gs.baseUrl ? `${gs.baseUrl.replace(/\/$/, '')}/${localShareId}` : null;
@@ -46,11 +56,11 @@ function start() {
   return { id: currentSession.id, resumed: false, photos: [] };
 }
 
-function getActive() {
+export function getActive(): Session | null {
   return currentSession;
 }
 
-function addPhoto(filename) {
+export function addPhoto(filename: string): number {
   if (!currentSession) {
     throw new Error('No active session');
   }
@@ -64,20 +74,20 @@ function addPhoto(filename) {
   return currentSession.photoCount;
 }
 
-function end(contactInfo) {
+export function end(contactInfo: ContactInfo): SessionEndResult {
   if (!currentSession) {
     throw new Error('No active session');
   }
 
   const cfg = config.get().app;
-  const gs = cfg.galleryServer || {};
+  const gs = cfg.galleryServer || ({} as { resize?: { enabled: boolean } });
   const resize = (gs.resize && gs.resize.enabled) ? gs.resize : null;
-  const metadata = {
+  const metadata: SessionMetadata = {
     sessionId: currentSession.id,
     shareId: currentSession.shareId || null,
     shareUrl: currentSession.shareUrl || null,
     eventName: cfg.eventName || null,
-    resize: resize,
+    resize: resize || null,
     startedAt: currentSession.startedAt,
     endedAt: new Date().toISOString(),
     photoCount: currentSession.photoCount,
@@ -101,10 +111,8 @@ function end(contactInfo) {
   return { id: sessionId, shareId, shareUrl, metadata };
 }
 
-function setShare(shareId, shareUrl) {
+export function setShare(shareId: string, shareUrl: string): void {
   if (!currentSession) return;
   currentSession.shareId = shareId;
   currentSession.shareUrl = shareUrl;
 }
-
-module.exports = { start, end, getActive, addPhoto, setShare };

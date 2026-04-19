@@ -1,19 +1,24 @@
-const http = require('http');
-const express = require('express');
-const { WebSocketServer } = require('ws');
-const path = require('path');
-const fs = require('fs');
+import http from 'http';
+import express from 'express';
+import { WebSocketServer, type WebSocket } from 'ws';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const config = require('./src/config');
-const preview = require('./src/preview');
-const camera = require('./src/camera');
-const session = require('./src/session');
-const gallery = require('./src/gallery');
+import * as config from './config.js';
+import * as preview from './preview.js';
+import * as camera from './camera.js';
+import * as session from './session.js';
+import * as gallery from './gallery.js';
+import type { ContactInfo, FrontendConfig, WsMessage } from './types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load configuration
 const cfg = config.load();
 
-let autofocusInterval = null;
+let autofocusInterval: ReturnType<typeof setInterval> | null = null;
 
 // Ensure sessions directory exists
 const sessionsDir = path.resolve(cfg.app.sessionsDir);
@@ -22,18 +27,20 @@ fs.mkdirSync(sessionsDir, { recursive: true });
 // Express app
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve vendor libraries from node_modules
-app.use('/vendor/qrcode.js', express.static(path.join(__dirname, 'node_modules/qrcode-generator/dist/qrcode.js')));
+// In production, serve the Vite build output
+const distPath = path.join(__dirname, '..', 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+}
 
 // Serve session photos for thumbnail display
 app.use('/sessions', express.static(sessionsDir));
 
 // REST endpoint to get current config (non-sensitive, for frontend countdown value etc.)
-app.get('/api/config', (req, res) => {
+app.get('/api/config', (_req, res) => {
   const gs = cfg.app.galleryServer;
-  res.json({
+  const frontendConfig: FrontendConfig = {
     countdownSeconds: cfg.app.countdownSeconds,
     cameraPosition: cfg.app.cameraPosition || 'above',
     lookText: cfg.app.lookText || 'Look up here!',
@@ -43,25 +50,54 @@ app.get('/api/config', (req, res) => {
     crop: cfg.preview.crop || null,
     shutterOffsetMs: cfg.app.shutterOffsetMs || 0,
     galleryEnabled: !!(gs && gs.enabled)
-  });
+  };
+  res.json(frontendConfig);
 });
+
+// In production, serve index.html for all non-API routes (SPA fallback)
+if (fs.existsSync(distPath)) {
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
+}
 
 // Create HTTP server
 const server = http.createServer(app);
 
-// WebSocket server
-const wss = new WebSocketServer({ server });
+// WebSocket server — use explicit /ws path so Vite dev proxy can forward it
+const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws) => {
+// WS heartbeat — detect stale connections
+const WS_PING_INTERVAL = 30_000;
+const WS_PONG_TIMEOUT = 10_000;
+const aliveMap = new WeakMap<WebSocket, boolean>();
+
+const heartbeatInterval = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (aliveMap.get(ws) === false) {
+      console.log('[ws] Client unresponsive, terminating');
+      ws.terminate();
+      continue;
+    }
+    aliveMap.set(ws, false);
+    ws.ping();
+  }
+}, WS_PING_INTERVAL);
+
+wss.on('close', () => clearInterval(heartbeatInterval));
+
+wss.on('connection', (ws: WebSocket) => {
   console.log('[ws] Client connected');
+  aliveMap.set(ws, true);
+  ws.on('pong', () => aliveMap.set(ws, true));
 
   // Register for preview frames
   preview.addClient(ws);
 
-  ws.on('message', async (data) => {
-    let msg;
+  ws.on('message', async (data: Buffer | string) => {
+    let msg: WsMessage;
     try {
-      msg = JSON.parse(data.toString());
+      msg = JSON.parse(data.toString()) as WsMessage;
     } catch {
       return;
     }
@@ -111,36 +147,43 @@ wss.on('connection', (ws) => {
 
           const photoNum = active.photoCount + 1;
 
-          // Capture + download — onCaptured fires right after shutter,
-          // download continues in background after that
+          // Capture + download with single retry on failure (USB glitches)
           stopAutofocusLoop();
-          camera.captureAndDownload(active.dir, photoNum, () => {
-            // Shutter has fired — notify client immediately
-            send(ws, 'capture:captured', { photoNumber: photoNum });
-          }).then((result) => {
-            session.addPhoto(result.filename);
-            send(ws, 'capture:complete', {
-              filename: result.filename,
-              photoNumber: photoNum,
-              url: `/sessions/${active.id}/${result.filename}`
-            });
-            startAutofocusLoop();
+          const attemptCapture = (retry: boolean) => {
+            camera.captureAndDownload(active.dir, photoNum, () => {
+              // Shutter has fired — notify client immediately
+              send(ws, 'capture:captured', { photoNumber: photoNum });
+            }).then((result) => {
+              session.addPhoto(result.filename);
+              send(ws, 'capture:complete', {
+                filename: result.filename,
+                photoNumber: photoNum,
+                url: `/sessions/${active.id}/${result.filename}`
+              });
+              startAutofocusLoop();
 
-            // Upload photo to gallery server in the background
-            if (gallery.isEnabled() && active.shareId) {
-              gallery.uploadPhoto(active.shareId, result.path).catch(() => {});
-            }
-          }).catch((err) => {
-            console.error('[capture] Error:', err.message);
-            send(ws, 'capture:error', { message: err.message });
-            startAutofocusLoop();
-          });
+              // Upload photo to gallery server in the background
+              if (gallery.isEnabled() && active.shareId) {
+                gallery.uploadPhoto(active.shareId, result.path).catch(() => {});
+              }
+            }).catch((err: Error) => {
+              if (retry) {
+                console.warn('[capture] First attempt failed, retrying in 1s:', err.message);
+                setTimeout(() => attemptCapture(false), 1000);
+              } else {
+                console.error('[capture] Error:', err.message);
+                send(ws, 'capture:error', { message: err.message });
+                startAutofocusLoop();
+              }
+            });
+          };
+          attemptCapture(true);
           break;
         }
 
         case 'session:end': {
           stopAutofocusLoop();
-          const contactInfo = payload || {};
+          const contactInfo = (payload || {}) as ContactInfo;
           try {
             const result = session.end(contactInfo);
             send(ws, 'session:ended', result);
@@ -150,7 +193,7 @@ wss.on('connection', (ws) => {
               gallery.uploadMetadata(result.shareId, result.metadata).catch(() => {});
             }
           } catch (err) {
-            send(ws, 'error', { message: err.message });
+            send(ws, 'error', { message: (err as Error).message });
           }
           break;
         }
@@ -159,8 +202,8 @@ wss.on('connection', (ws) => {
           console.log('[ws] Unknown message type:', type);
       }
     } catch (err) {
-      console.error('[ws] Error handling message:', err.message);
-      send(ws, 'error', { message: err.message });
+      console.error('[ws] Error handling message:', (err as Error).message);
+      send(ws, 'error', { message: (err as Error).message });
     }
   });
 
@@ -170,20 +213,20 @@ wss.on('connection', (ws) => {
   });
 });
 
-function send(ws, type, payload) {
+function send(ws: WebSocket, type: string, payload: unknown): void {
   if (ws.readyState === 1) {
     ws.send(JSON.stringify({ type, payload }));
   }
 }
 
 // Startup
-async function init() {
+async function init(): Promise<void> {
   // Detect and configure camera
   try {
     await camera.detectCamera();
     await camera.applySettings();
   } catch (err) {
-    console.warn('[init] Camera setup failed (will retry on capture):', err.message);
+    console.warn('[init] Camera setup failed (will retry on capture):', (err as Error).message);
   }
 
   // Start live preview
@@ -199,7 +242,7 @@ async function init() {
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
 
-function shutdown() {
+function shutdown(): void {
   console.log('[server] Shutting down...');
   stopAutofocusLoop();
   preview.stop();
@@ -208,7 +251,7 @@ function shutdown() {
   process.exit(0);
 }
 
-function startAutofocusLoop() {
+function startAutofocusLoop(): void {
   if (cfg.app.periodicAutofocus === false) return;
   stopAutofocusLoop();
   autofocusInterval = setInterval(() => {
@@ -219,12 +262,22 @@ function startAutofocusLoop() {
   console.log('[server] Autofocus loop started (every 5s)');
 }
 
-function stopAutofocusLoop() {
+function stopAutofocusLoop(): void {
   if (autofocusInterval) {
     clearInterval(autofocusInterval);
     autofocusInterval = null;
     console.log('[server] Autofocus loop stopped');
   }
 }
+
+// Catch-all error handlers — log before pm2 restarts the process
+process.on('uncaughtException', (err) => {
+  console.error('[FATAL] Uncaught exception:', err);
+  shutdown();
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[FATAL] Unhandled rejection:', reason);
+});
 
 init();

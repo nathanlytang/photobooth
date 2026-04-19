@@ -1,11 +1,16 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import type { PhotoboothConfig } from './types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
 
-let config = null;
+let config: PhotoboothConfig | null = null;
 
-function load() {
+export function load(): PhotoboothConfig {
   if (!fs.existsSync(CONFIG_PATH)) {
     console.error('[config] config.json not found.');
     console.error('[config] Copy the example config to get started:');
@@ -15,36 +20,36 @@ function load() {
 
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
-    config = JSON.parse(raw);
+    config = JSON.parse(raw) as PhotoboothConfig;
     validate(config);
     console.log('[config] Loaded config.json');
     return config;
   } catch (err) {
-    console.error('[config] Failed to load config.json:', err.message);
+    console.error('[config] Failed to load config.json:', (err as Error).message);
     process.exit(1);
   }
 }
 
-function validate(cfg) {
+function validate(cfg: PhotoboothConfig): void {
   if (!cfg.camera) throw new Error('Missing "camera" section in config');
   if (!cfg.preview) throw new Error('Missing "preview" section in config');
   if (!cfg.app) throw new Error('Missing "app" section in config');
 
-  const requiredCamera = ['iso', 'shutterSpeed', 'aperture', 'whiteBalance', 'captureTarget'];
+  const requiredCamera = ['iso', 'shutterSpeed', 'aperture', 'whiteBalance', 'captureTarget'] as const;
   for (const key of requiredCamera) {
     if (cfg.camera[key] === undefined) {
       throw new Error(`Missing camera.${key} in config`);
     }
   }
 
-  const requiredPreview = ['device', 'width', 'height', 'fps'];
+  const requiredPreview: (keyof typeof cfg.preview)[] = ['device', 'width', 'height', 'fps'];
   for (const key of requiredPreview) {
     if (cfg.preview[key] === undefined) {
       throw new Error(`Missing preview.${key} in config`);
     }
   }
 
-  const requiredApp = ['port', 'sessionsDir', 'countdownSeconds'];
+  const requiredApp: (keyof typeof cfg.app)[] = ['port', 'sessionsDir', 'countdownSeconds'];
   for (const key of requiredApp) {
     if (cfg.app[key] === undefined) {
       throw new Error(`Missing app.${key} in config`);
@@ -59,9 +64,7 @@ function validate(cfg) {
   }
 }
 
-function get() {
+export function get(): PhotoboothConfig {
   if (!config) load();
-  return config;
+  return config!;
 }
-
-module.exports = { load, get };

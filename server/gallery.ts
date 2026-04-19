@@ -1,45 +1,53 @@
-const fs = require('fs');
-const path = require('path');
-const http = require('http');
-const https = require('https');
-const config = require('./config');
+import fs from 'fs';
+import path from 'path';
+import http from 'http';
+import https from 'https';
+import * as config from './config.js';
+import type { GalleryServerConfig, SessionMetadata, ShareResult } from './types.js';
 
-function isEnabled() {
+export function isEnabled(): boolean {
   const gs = config.get().app.galleryServer;
-  return gs && gs.enabled;
+  return !!(gs && gs.enabled);
 }
 
-function getGalleryConfig() {
-  return config.get().app.galleryServer;
+function getGalleryConfig(): GalleryServerConfig {
+  return config.get().app.galleryServer!;
 }
 
-function request(method, urlPath, body, contentType) {
+function request(
+  method: string,
+  urlPath: string,
+  body?: unknown,
+  contentType?: string
+): Promise<any> {
   return new Promise((resolve, reject) => {
     const gs = getGalleryConfig();
     const base = new URL(gs.baseUrl);
     const isHttps = base.protocol === 'https:';
     const mod = isHttps ? https : http;
 
-    const options = {
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${gs.authToken}`,
+    };
+
+    if (contentType) {
+      headers['Content-Type'] = contentType;
+    }
+
+    const options: http.RequestOptions = {
       hostname: base.hostname,
       port: base.port || (isHttps ? 443 : 80),
       path: urlPath,
       method,
-      headers: {
-        'Authorization': `Bearer ${gs.authToken}`,
-      },
+      headers,
       timeout: 30000,
     };
 
-    if (contentType) {
-      options.headers['Content-Type'] = contentType;
-    }
-
     const req = mod.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => { data += chunk; });
+      res.on('data', (chunk: string) => { data += chunk; });
       res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
+        if (res.statusCode! >= 200 && res.statusCode! < 300) {
           try {
             resolve(JSON.parse(data));
           } catch {
@@ -64,29 +72,29 @@ function request(method, urlPath, body, contentType) {
   });
 }
 
-async function createShare(shareId) {
+export async function createShare(shareId?: string | null): Promise<ShareResult | null> {
   if (!isEnabled()) return null;
 
   try {
     const gs = getGalleryConfig();
-    const body = {};
+    const body: Record<string, unknown> = {};
     if (shareId) {
       body.shareId = shareId;
     }
     if (gs.resize !== undefined) {
       body.resize = gs.resize;
     }
-    const result = await request('POST', '/api/shares', body, 'application/json');
+    const result = await request('POST', '/api/shares', body, 'application/json') as ShareResult;
     console.log(`[gallery] Created share: ${result.shareId} -> ${result.shareUrl}`);
     return result;
   } catch (err) {
     console.log(err);
-    console.error('[gallery] Failed to create share:', err.message);
+    console.error('[gallery] Failed to create share:', (err as Error).message);
     return null;
   }
 }
 
-async function uploadPhoto(shareId, filePath) {
+export async function uploadPhoto(shareId: string, filePath: string): Promise<void> {
   if (!isEnabled() || !shareId) return;
 
   try {
@@ -107,7 +115,7 @@ async function uploadPhoto(shareId, filePath) {
     const footer = Buffer.from(`\r\n--${boundary}--\r\n`);
     const body = Buffer.concat([header, fileData, footer]);
 
-    const options = {
+    const options: http.RequestOptions = {
       hostname: base.hostname,
       port: base.port || (isHttps ? 443 : 80),
       path: `/api/shares/${shareId}/photos`,
@@ -120,13 +128,13 @@ async function uploadPhoto(shareId, filePath) {
       timeout: 60000,
     };
 
-    await new Promise((resolve, reject) => {
+    await new Promise<void>((resolve, reject) => {
       const req = mod.request(options, (res) => {
         let data = '';
-        res.on('data', (chunk) => { data += chunk; });
+        res.on('data', (chunk: string) => { data += chunk; });
         res.on('end', () => {
-          if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve(data);
+          if (res.statusCode! >= 200 && res.statusCode! < 300) {
+            resolve();
           } else {
             reject(new Error(`Upload failed with ${res.statusCode}: ${data}`));
           }
@@ -145,19 +153,17 @@ async function uploadPhoto(shareId, filePath) {
 
     console.log(`[gallery] Uploaded photo ${filename} to share ${shareId}`);
   } catch (err) {
-    console.error(`[gallery] Failed to upload photo:`, err.message);
+    console.error(`[gallery] Failed to upload photo:`, (err as Error).message);
   }
 }
 
-async function uploadMetadata(shareId, metadata) {
+export async function uploadMetadata(shareId: string, metadata: SessionMetadata): Promise<void> {
   if (!isEnabled() || !shareId) return;
 
   try {
     await request('PUT', `/api/shares/${shareId}/metadata`, metadata, 'application/json');
     console.log(`[gallery] Uploaded metadata to share ${shareId}`);
   } catch (err) {
-    console.error('[gallery] Failed to upload metadata:', err.message);
+    console.error('[gallery] Failed to upload metadata:', (err as Error).message);
   }
 }
-
-module.exports = { isEnabled, createShare, uploadPhoto, uploadMetadata };

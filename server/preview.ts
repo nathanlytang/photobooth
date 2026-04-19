@@ -1,16 +1,21 @@
-const { spawn } = require('child_process');
-const config = require('./config');
+import { spawn, type ChildProcess } from 'child_process';
+import type { WebSocket } from 'ws';
+import * as config from './config.js';
 
-let ffmpegProcess = null;
-let clients = new Set();
+let ffmpegProcess: ChildProcess | null = null;
+const clients = new Set<WebSocket>();
 
 // MJPEG boundary marker
 const JPEG_START = Buffer.from([0xff, 0xd8]);
 const JPEG_END = Buffer.from([0xff, 0xd9]);
 
 let frameBuffer = Buffer.alloc(0);
+const MAX_FRAME_BUFFER = 5 * 1024 * 1024; // 5MB cap to prevent memory leaks
 
-function start() {
+let shouldRestart = false;
+let restartTimeout: ReturnType<typeof setTimeout> | null = null;
+
+export function start(): void {
   const cfg = config.get().preview;
 
   const args = [
@@ -27,16 +32,24 @@ function start() {
 
   console.log('[preview] Starting ffmpeg:', 'ffmpeg', args.join(' '));
 
+  shouldRestart = true;
+  frameBuffer = Buffer.alloc(0);
+
   ffmpegProcess = spawn('ffmpeg', args, {
     stdio: ['ignore', 'pipe', 'pipe']
   });
 
-  ffmpegProcess.stdout.on('data', (chunk) => {
+  ffmpegProcess.stdout!.on('data', (chunk: Buffer) => {
     frameBuffer = Buffer.concat([frameBuffer, chunk]);
+    // Cap buffer to prevent memory leaks if frames aren't being consumed
+    if (frameBuffer.length > MAX_FRAME_BUFFER) {
+      console.warn('[preview] Frame buffer overflow, resetting');
+      frameBuffer = Buffer.alloc(0);
+    }
     extractAndBroadcastFrames();
   });
 
-  ffmpegProcess.stderr.on('data', (data) => {
+  ffmpegProcess.stderr!.on('data', (data: Buffer) => {
     const msg = data.toString().trim();
     if (msg) {
       console.log('[preview] ffmpeg:', msg);
@@ -46,6 +59,13 @@ function start() {
   ffmpegProcess.on('close', (code) => {
     console.log(`[preview] ffmpeg exited with code ${code}`);
     ffmpegProcess = null;
+    if (shouldRestart) {
+      console.log('[preview] Auto-restarting ffmpeg in 3s...');
+      restartTimeout = setTimeout(() => {
+        restartTimeout = null;
+        if (shouldRestart) start();
+      }, 3000);
+    }
   });
 
   ffmpegProcess.on('error', (err) => {
@@ -54,7 +74,7 @@ function start() {
   });
 }
 
-function extractAndBroadcastFrames() {
+function extractAndBroadcastFrames(): void {
   while (true) {
     const startIdx = frameBuffer.indexOf(JPEG_START);
     if (startIdx === -1) {
@@ -78,7 +98,7 @@ function extractAndBroadcastFrames() {
   }
 }
 
-function broadcast(frame) {
+function broadcast(frame: Buffer): void {
   const message = Buffer.concat([
     Buffer.from('FRAME'),
     frame
@@ -88,32 +108,36 @@ function broadcast(frame) {
     if (client.readyState === 1) { // WebSocket.OPEN
       try {
         client.send(message);
-      } catch (err) {
+      } catch {
         // Client disconnected
       }
     }
   }
 }
 
-function addClient(ws) {
+export function addClient(ws: WebSocket): void {
   clients.add(ws);
   ws.on('close', () => clients.delete(ws));
 }
 
-function removeClient(ws) {
+export function removeClient(ws: WebSocket): void {
   clients.delete(ws);
 }
 
-function stop() {
+export function stop(): void {
+  shouldRestart = false;
+  if (restartTimeout) {
+    clearTimeout(restartTimeout);
+    restartTimeout = null;
+  }
   if (ffmpegProcess) {
     ffmpegProcess.kill('SIGTERM');
     ffmpegProcess = null;
   }
   clients.clear();
+  frameBuffer = Buffer.alloc(0);
 }
 
-function isRunning() {
+export function isRunning(): boolean {
   return ffmpegProcess !== null;
 }
-
-module.exports = { start, stop, addClient, removeClient, isRunning };

@@ -1,9 +1,10 @@
-const { execFile } = require('child_process');
-const path = require('path');
-const config = require('./config');
+import { execFile } from 'child_process';
+import path from 'path';
+import * as config from './config.js';
+import type { CaptureResult } from './types.js';
 
 // gphoto2 config path for each known camera setting
-const ALL_SETTINGS = {
+const ALL_SETTINGS: Record<string, string> = {
   iso: '/main/imgsettings/iso',
   shutterSpeed: '/main/capturesettings/shutterspeed',
   aperture: '/main/capturesettings/f-number',
@@ -12,28 +13,28 @@ const ALL_SETTINGS = {
 };
 
 // Build map from only the settings present in config.json
-function buildSettingMap() {
+function buildSettingMap(): Record<string, string> {
   const cam = config.get().camera || {};
-  const map = {};
-  for (const [key, path] of Object.entries(ALL_SETTINGS)) {
+  const map: Record<string, string> = {};
+  for (const [key, configPath] of Object.entries(ALL_SETTINGS)) {
     if (cam[key] !== undefined) {
-      map[key] = path;
+      map[key] = configPath;
     }
   }
   return map;
 }
 
 // Mutex to serialize all USB access — prevents "Could not claim the USB device"
-let usbLock = Promise.resolve();
+let usbLock: Promise<unknown> = Promise.resolve();
 
-function withUsbLock(fn) {
-  const next = usbLock.then(fn, fn);
+function withUsbLock<T>(fn: () => Promise<T>): Promise<T> {
+  const next = usbLock.then(fn, fn) as Promise<T>;
   usbLock = next.catch(() => {});
   return next;
 }
 
-function gphoto2(args, timeout = 30000) {
-  return withUsbLock(() => new Promise((resolve, reject) => {
+function gphoto2(args: string[], timeout = 30000): Promise<string> {
+  return withUsbLock(() => new Promise<string>((resolve, reject) => {
     const proc = execFile('gphoto2', args, { timeout, killSignal: 'SIGKILL' }, (err, stdout, stderr) => {
       if (err) {
         reject(new Error(`gphoto2 ${args.join(' ')} failed: ${err.message}\n${stderr}`));
@@ -47,7 +48,7 @@ function gphoto2(args, timeout = 30000) {
   }));
 }
 
-async function applySettings() {
+export async function applySettings(): Promise<void> {
   const cam = config.get().camera;
   const settingMap = buildSettingMap();
   console.log('[camera] Applying camera settings...');
@@ -57,7 +58,7 @@ async function applySettings() {
       await gphoto2(['--set-config', `${configPath}=${cam[key]}`]);
       console.log(`[camera]   ${key} = ${cam[key]}`);
     } catch (err) {
-      console.warn(`[camera]   Failed to set ${key}: ${err.message}`);
+      console.warn(`[camera]   Failed to set ${key}: ${(err as Error).message}`);
     }
   }
 
@@ -69,14 +70,18 @@ async function applySettings() {
       await gphoto2(['--set-config', `/main/settings/capturetarget=${targetValue}`]);
       console.log(`[camera]   captureTarget = ${cam.captureTarget}`);
     } catch (err) {
-      console.warn(`[camera]   Failed to set captureTarget: ${err.message}`);
+      console.warn(`[camera]   Failed to set captureTarget: ${(err as Error).message}`);
     }
   }
 
   console.log('[camera] Settings applied');
 }
 
-async function captureAndDownload(destDir, photoNumber, onCaptured) {
+export async function captureAndDownload(
+  destDir: string,
+  photoNumber: number,
+  onCaptured?: () => void
+): Promise<CaptureResult> {
   const filename = `IMG_${String(photoNumber).padStart(3, '0')}.jpg`;
   const destPath = path.join(destDir, filename);
 
@@ -89,7 +94,7 @@ async function captureAndDownload(destDir, photoNumber, onCaptured) {
     await new Promise(resolve => setTimeout(resolve, 1500));
     console.log('[camera] Autofocus complete');
   } catch (err) {
-    console.warn('[camera] Autofocus failed (continuing with capture):', err.message);
+    console.warn('[camera] Autofocus failed (continuing with capture):', (err as Error).message);
   }
 
   console.log('[camera] Triggering capture...');
@@ -128,7 +133,7 @@ async function captureAndDownload(destDir, photoNumber, onCaptured) {
   return { filename, path: destPath };
 }
 
-async function detectCamera(retryInterval = 5000, maxRetries = Infinity) {
+export async function detectCamera(retryInterval = 5000, maxRetries = Infinity): Promise<string> {
   let attempts = 0;
   while (attempts < maxRetries) {
     attempts++;
@@ -140,7 +145,7 @@ async function detectCamera(retryInterval = 5000, maxRetries = Infinity) {
         console.log('[camera] Detected cameras:\n', output);
         return output;
       }
-    } catch (err) {
+    } catch {
       // detection failed
     }
     console.log(`[camera] No camera detected — is it turned on? Retrying in ${retryInterval / 1000}s... (attempt ${attempts})`);
@@ -149,13 +154,11 @@ async function detectCamera(retryInterval = 5000, maxRetries = Infinity) {
   throw new Error('Camera not detected after maximum retries');
 }
 
-async function triggerAutofocus() {
+export async function triggerAutofocus(): Promise<void> {
   try {
     await gphoto2(['--set-config', '/main/actions/autofocusdrive=1'], 10000);
     console.log('[camera] Periodic autofocus triggered');
   } catch (err) {
-    console.warn('[camera] Periodic autofocus failed:', err.message);
+    console.warn('[camera] Periodic autofocus failed:', (err as Error).message);
   }
 }
-
-module.exports = { applySettings, captureAndDownload, detectCamera, triggerAutofocus };
