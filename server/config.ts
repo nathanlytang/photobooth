@@ -35,10 +35,22 @@ function validate(cfg: PhotoboothConfig): void {
   if (!cfg.preview) throw new Error('Missing "preview" section in config');
   if (!cfg.app) throw new Error('Missing "app" section in config');
 
-  const requiredCamera = ['iso', 'shutterSpeed', 'aperture', 'whiteBalance', 'captureTarget'] as const;
+  const requiredCamera = ['iso', 'shutterSpeed', 'aperture', 'captureTarget'] as const;
   for (const key of requiredCamera) {
     if (cfg.camera[key] === undefined) {
       throw new Error(`Missing camera.${key} in config`);
+    }
+  }
+
+  // camera.paths — every gphoto2 path must live in config now.
+  if (!cfg.camera.paths || typeof cfg.camera.paths !== 'object') {
+    throw new Error('Missing "camera.paths" section in config');
+  }
+  const requiredPaths = ['iso', 'shutterSpeed', 'aperture', 'autofocus', 'captureTarget'] as const;
+  for (const key of requiredPaths) {
+    const v = (cfg.camera.paths as unknown as Record<string, unknown>)[key];
+    if (typeof v !== 'string' || v.length === 0) {
+      throw new Error(`Missing or empty camera.paths.${key} in config`);
     }
   }
 
@@ -61,6 +73,43 @@ function validate(cfg: PhotoboothConfig): void {
     const gs = cfg.app.galleryServer;
     if (!gs.baseUrl) throw new Error('Missing galleryServer.baseUrl in config');
     if (!gs.authToken) throw new Error('Missing galleryServer.authToken in config');
+  }
+
+  // Validate video config if enabled
+  if (cfg.app.video && cfg.app.video.enabled) {
+    const v = cfg.app.video;
+    if (typeof v.maxRecordSeconds !== 'number' || v.maxRecordSeconds <= 0) {
+      throw new Error('video.maxRecordSeconds must be a positive number');
+    }
+    if (typeof v.countdownSeconds !== 'number' || v.countdownSeconds < 0) {
+      throw new Error('video.countdownSeconds must be a non-negative number');
+    }
+    if (v.startOffsetMs !== undefined && (typeof v.startOffsetMs !== 'number' || v.startOffsetMs < 0)) {
+      throw new Error('video.startOffsetMs must be a non-negative number');
+    }
+    const movie = cfg.camera.movie;
+    if (!movie) {
+      throw new Error('camera.movie is required when app.video.enabled is true');
+    }
+    const requiredMovie: (keyof typeof movie)[] = [
+      'startConfigPath', 'startValue', 'stopConfigPath', 'stopValue', 'fileExtension'
+    ];
+    for (const key of requiredMovie) {
+      if (movie[key] === undefined || movie[key] === null || movie[key] === '') {
+        throw new Error(`Missing camera.movie.${String(key)} in config`);
+      }
+    }
+    if (v.share && v.share.enabled) {
+      if (typeof v.share.upload !== 'boolean') {
+        throw new Error('video.share.upload must be a boolean when video.share.enabled is true');
+      }
+      if (v.share.upload && !(cfg.app.galleryServer && cfg.app.galleryServer.enabled)) {
+        console.warn('[config] video.share.upload is true but galleryServer is not enabled; uploads will be skipped.');
+      }
+      if (v.share.uploadTiming && v.share.uploadTiming !== 'immediate' && v.share.uploadTiming !== 'onEnd') {
+        throw new Error('video.share.uploadTiming must be "immediate" or "onEnd"');
+      }
+    }
   }
 }
 

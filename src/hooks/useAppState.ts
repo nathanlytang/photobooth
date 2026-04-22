@@ -5,6 +5,7 @@ import type {
   OverlayName,
   ThumbnailItem,
 } from '../types';
+import type { SuccessVariant } from '../components/SuccessOverlay';
 
 const DEFAULT_CONFIG: FrontendConfig = {
   countdownSeconds: 5,
@@ -17,6 +18,15 @@ const DEFAULT_CONFIG: FrontendConfig = {
   crop: null,
   shutterOffsetMs: 0,
   galleryEnabled: false,
+  video: {
+    enabled: false,
+    maxRecordSeconds: 60,
+    countdownSeconds: 3,
+    startOffsetMs: 0,
+    prompts: [],
+    promptsPersistDuringRecording: true,
+    shareEnabled: false,
+  },
 };
 
 export function useAppState() {
@@ -29,6 +39,21 @@ export function useAppState() {
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [sessionPhotoCount, setSessionPhotoCount] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+
+  // Video-guestbook state
+  const [sessionType, setSessionType] = useState<'photo' | 'video' | null>(null);
+  const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
+  const [keptTakeCount, setKeptTakeCount] = useState(0);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(null);
+  const [recordingMaxSeconds, setRecordingMaxSeconds] = useState(60);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Label shown under the processing spinner (so the same overlay can render
+  // "Capturing...", "Starting camera...", "Saving video...").
+  const [processingLabel, setProcessingLabel] = useState<string>('Capturing...');
+  // Success overlay variant — chooses wording per flow.
+  const [successVariant, setSuccessVariant] = useState<SuccessVariant>('photos-sent');
 
   // Refs for countdown timer management
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,6 +73,11 @@ export function useAppState() {
       setPendingShareUrl(null);
       setSessionPhotoCount(0);
       setOverlay(null);
+      setSessionType(null);
+      setSelectedPrompt(null);
+      setKeptTakeCount(0);
+      setRecordingStartedAt(null);
+      setElapsedSeconds(0);
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
@@ -55,6 +85,10 @@ export function useAppState() {
       if (triggerTimeoutRef.current) {
         clearTimeout(triggerTimeoutRef.current);
         triggerTimeoutRef.current = null;
+      }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
       }
     }, IDLE_TIMEOUT_MS);
   }, []);
@@ -181,6 +215,86 @@ export function useAppState() {
     }
   }, []);
 
+  // --- Video-guestbook actions ---
+
+  const beginVideoSession = useCallback(() => {
+    setSessionType('video');
+    setSelectedPrompt(null);
+    setKeptTakeCount(0);
+    setRecordingStartedAt(null);
+    setElapsedSeconds(0);
+  }, []);
+
+  const endVideoState = useCallback(() => {
+    setSessionType(null);
+    setSelectedPrompt(null);
+    setKeptTakeCount(0);
+    setRecordingStartedAt(null);
+    setElapsedSeconds(0);
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
+  /**
+   * Server-driven countdown for video recording: runs the overlay for `seconds`
+   * and then calls `onTrigger` so the caller can send
+   * `video:start-recording-confirm`.
+   */
+  const startVideoCountdown = useCallback((
+    seconds: number,
+    startOffsetMs: number,
+    onTrigger: () => void,
+  ) => {
+    if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+    if (triggerTimeoutRef.current) clearTimeout(triggerTimeoutRef.current);
+
+    if (seconds <= 0) {
+      onTrigger();
+      return;
+    }
+
+    let remaining = seconds;
+    setCountdownValue(remaining);
+    setOverlay('countdown');
+
+    const offset = Math.max(0, Math.min(startOffsetMs, seconds * 1000));
+    const triggerDelayMs = (seconds * 1000) - offset;
+    triggerTimeoutRef.current = setTimeout(() => {
+      onTrigger();
+    }, triggerDelayMs);
+
+    countdownTimerRef.current = setInterval(() => {
+      remaining--;
+      if (remaining > 0) {
+        setCountdownValue(remaining);
+      } else {
+        if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+        setOverlay('processing');
+      }
+    }, 1000);
+  }, []);
+
+  const beginRecordingTimer = useCallback((maxSeconds: number) => {
+    setRecordingMaxSeconds(maxSeconds);
+    const now = Date.now();
+    setRecordingStartedAt(now);
+    setElapsedSeconds(0);
+    if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - now) / 1000));
+    }, 250);
+  }, []);
+
+  const stopRecordingTimer = useCallback(() => {
+    if (recordingTimerRef.current) {
+      clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
+    }
+  }, []);
+
   return {
     // State
     config,
@@ -192,12 +306,24 @@ export function useAppState() {
     pendingShareUrl,
     sessionPhotoCount,
     flashActive,
+    sessionType,
+    selectedPrompt,
+    keptTakeCount,
+    recordingStartedAt,
+    recordingMaxSeconds,
+    elapsedSeconds,
+    processingLabel,
+    successVariant,
 
     // Setters
     setConfig,
     setIsCapturing,
     setPendingShareUrl,
     setSessionPhotoCount,
+    setSelectedPrompt,
+    setKeptTakeCount,
+    setProcessingLabel,
+    setSuccessVariant,
 
     // Actions
     loadConfig,
@@ -213,6 +339,11 @@ export function useAppState() {
     clearCountdown,
     resetIdleTimeout,
     clearIdleTimeout,
+    beginVideoSession,
+    endVideoState,
+    startVideoCountdown,
+    beginRecordingTimer,
+    stopRecordingTimer,
   };
 }
 
