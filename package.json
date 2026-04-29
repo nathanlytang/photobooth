@@ -1,13 +1,15 @@
 {
   "name": "photobooth",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Photobooth with HDMI capture live preview and gphoto2 camera control",
-  "main": "server.js",
+  "type": "module",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node server.js",
-    "build:css": "tailwindcss -i src/input.css -o public/tailwind.css",
-    "watch:css": "tailwindcss -i src/input.css -o public/tailwind.css --watch"
+    "dev": "concurrently -n server,vite -c blue,green \"tsx watch server/index.ts\" \"vite\"",
+    "dev:server": "tsx watch server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "node --import tsx server/index.ts",
+    "preview": "vite preview"
   },
   "keywords": [
     "photobooth",
@@ -17,12 +19,28 @@
   "dependencies": {
     "express": "^4.21.0",
     "nanoid": "^3.3.11",
-    "qrcode-generator": "^2.0.4",
     "ws": "^8.18.0"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.2.8",
-    "@tailwindcss/cli": "^4.2.2",
-    "tailwindcss": "^4.2.2"
+    "@tailwindcss/vite": "^4.2.2",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.5.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "concurrently": "^9.1.0",
+    "lucide-react": "^0.468.0",
+    "qrcode-generator": "^2.0.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^4.2.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "@vitejs/plugin-react": "^4.3.0"
   }
 }

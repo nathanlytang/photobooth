@@ -3,9 +3,38 @@
     "iso": "800",
     "shutterSpeed": "1/125",
     "aperture": "5.6",
-    "whiteBalance": "auto",
     "pictureProfile": "standard",
-    "captureTarget": "card"
+    "captureTarget": "card",
+    "persistentMovieMode": false,
+    "paths": {
+      "iso": "iso",
+      "shutterSpeed": "shutterspeed",
+      "aperture": "f-number",
+      "pictureProfile": "/main/capturesettings/picturestyle",
+      "autofocus": "autofocusdrive",
+      "captureTarget": "capturetarget"
+    },
+    "startupConfigs": [
+      { "path": "whitebalance", "value": "auto" }
+    ],
+    "video": {
+      "iso": "800",
+      "shutterSpeed": "1/60",
+      "aperture": "2.8",
+      "paths": {
+        "iso": "movieiso",
+        "shutterSpeed": "movieshutterspeed",
+        "aperture": "movief-number"
+      },
+      "startupConfigs": []
+    },
+    "movie": {
+      "startConfigPath": "movie",
+      "startValue": "1",
+      "stopConfigPath": "movie",
+      "stopValue": "0",
+      "fileExtension": "mov"
+    }
   },
   "preview": {
     "device": "/dev/video0",
@@ -44,6 +73,31 @@
         "longEdge": 1920,
         "percentage": 50,
         "quality": 85
+      }
+    },
+    "video": {
+      "enabled": false,
+      "maxRecordSeconds": 60,
+      "countdownSeconds": 3,
+      "startOffsetMs": 0,
+      "prompts": [
+        "What's your favorite memory with them?",
+        "Share a wish for the future.",
+        "Tell a funny story."
+      ],
+      "promptsPersistDuringRecording": true,
+      "audio": {
+        "externalMic": {
+          "enabled": false,
+          "ffmpegInput": "-f alsa -i hw:1,0",
+          "sampleRate": 48000,
+          "channels": 2
+        }
+      },
+      "share": {
+        "enabled": true,
+        "upload": true,
+        "uploadTiming": "immediate"
       }
     }
   }

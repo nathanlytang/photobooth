@@ -5,6 +5,7 @@ Photobooth application with HDMI capture live preview and gphoto2 camera control
 ## Requirements
 
 - **Node.js** 18+
+- **pnpm** 9+ (`corepack enable` or `npm install -g pnpm`)
 - **gphoto2**: `sudo apt install gphoto2`
 - **ffmpeg**: `sudo apt install ffmpeg`
 - **USB HDMI Capture Card** (UVC-compatible, e.g. MS2109 chipset)
@@ -14,16 +15,52 @@ Photobooth application with HDMI capture live preview and gphoto2 camera control
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Create your config file from the example
 cp config.example.json config.json
 
 # Edit camera and app settings
 nano config.json
+```
 
-# Start the server
-npm start
+## Development
+
+```bash
+# Run both frontend (Vite) and backend (tsx) in watch mode
+pnpm dev
+
+# Or run them separately
+pnpm dev:server   # Backend only (tsx watch)
+pnpm dev:client   # Frontend only (Vite HMR)
+```
+
+## Production
+
+```bash
+# Build the frontend
+pnpm build
+
+# Start the production server (serves built frontend + API + WebSocket)
+pnpm start
+```
+
+Using `pm2`:
+
+```bash
+# Build frontend
+pnpm build
+
+# Start with pm2
+pm2 start ecosystem.config.cjs
+
+# Enable auto-start on boot
+pm2 save && pm2 startup
+
+# Install log rotation
+pm2 install pm2-logrotate
+pm2 set pm2-logrotate:max_size 10M
+pm2 set pm2-logrotate:retain 5
 ```
 
 > **Note:** `config.json` must exist before the server will start. See `config.example.json` for the default template.
@@ -62,16 +99,66 @@ The web app also includes its own hardening layer (in case flags are unavailable
 
 ## Configuration
 
-Edit `config.json` to adjust camera and app settings:
+Edit `config.json` to adjust camera and app settings.
+
+### Camera
+
+Exposure values live at the top of the `camera` block. The **gphoto2 config paths**
+for every setting live in `camera.paths` — nothing is hardcoded, so you can use
+shortened names (e.g. `iso`) or fully-qualified paths (e.g. `/main/imgsettings/iso`)
+depending on what your camera body accepts. Run `gphoto2 --list-config` to inspect
+the paths your camera exposes.
 
 | Setting | Description |
 |---------|-------------|
-| `camera.iso` | ISO sensitivity (e.g. "400") |
-| `camera.shutterSpeed` | Shutter speed (e.g. "1/125") |
-| `camera.aperture` | Aperture f-stop (e.g. "4") |
-| `camera.whiteBalance` | White balance mode (e.g. "auto") |
-| `camera.pictureProfile` | Picture profile/style (e.g. "standard") |
-| `camera.captureTarget` | Where camera stores files ("card") |
+| `camera.iso` | ISO sensitivity for photo mode (e.g. `"400"`) |
+| `camera.shutterSpeed` | Shutter speed for photo mode (e.g. `"1/125"`) |
+| `camera.aperture` | Aperture f-stop for photo mode (e.g. `"4"`) |
+| `camera.pictureProfile` | Picture profile/style (optional) |
+| `camera.captureTarget` | `"card"` or `"internal"` — where the camera stores captures |
+| `camera.persistentMovieMode` | Keep the camera in movie mode at all times; photo captures are stills grabbed from live-view. See below. |
+| `camera.paths.iso` | gphoto2 config path for ISO (required) |
+| `camera.paths.shutterSpeed` | gphoto2 config path for shutter speed (required) |
+| `camera.paths.aperture` | gphoto2 config path for aperture (required) |
+| `camera.paths.pictureProfile` | gphoto2 config path for picture profile (optional) |
+| `camera.paths.autofocus` | gphoto2 config path for autofocus trigger (required) |
+| `camera.paths.captureTarget` | gphoto2 config path for capture target (required) |
+| `camera.startupConfigs` | Array of `{path, value}` pairs applied **once** when entering photo mode (e.g. white balance, anything else you want to set but not manage per-session). |
+| `camera.video.iso` | ISO override for video sessions (falls back to `camera.iso`) |
+| `camera.video.shutterSpeed` | Shutter speed override for video sessions |
+| `camera.video.aperture` | Aperture override for video sessions |
+| `camera.video.paths.*` | Per-key gphoto2 path overrides for video mode. Useful when the camera exposes separate controls for stills vs movie (e.g. `movieiso` instead of `iso`). |
+| `camera.video.startupConfigs` | One-shot configs applied when entering a video session. |
+| `camera.movie.startConfigPath` / `startValue` | gphoto2 config + value that begins a movie recording (e.g. `movie` = `1`). |
+| `camera.movie.stopConfigPath` / `stopValue` | gphoto2 config + value that stops a movie recording. |
+| `camera.movie.fileExtension` | Expected movie container extension (`"mov"` or `"mp4"`). |
+| `camera.movie.audioSource` | External mic device for ffmpeg (e.g. `hw:1,0` on Linux; leave `null` to use in-camera audio only). |
+| `camera.movie.audioCodec` | Audio codec when muxing external audio (default `aac`). |
+
+**Lifecycle of camera settings:**
+
+| Trigger | What runs |
+|---|---|
+| Server startup | `startupConfigs` for the base mode (`video` if `persistentMovieMode`, else `photo`), then photo settings applied |
+| Photo session start | `camera.startupConfigs` → photo settings (iso/shutter/aperture/…) |
+| Video session start | `camera.video.startupConfigs` → video settings (with `camera.video.paths` overrides) |
+| Session end | Photo settings re-applied (returns camera to idle defaults) |
+
+**Persistent movie mode** (`camera.persistentMovieMode: true`) is useful if you
+want photos captured as stills from live-view without toggling the camera in and
+out of movie mode per session. When enabled:
+
+- Both photo and video sessions write exposure through `camera.video.paths`
+  (e.g. `movieiso`) because the stills paths don't accept writes while the
+  camera is in movie mode.
+- Photo captures still work via `--capture-image` — on most bodies this grabs
+  a still from live-view.
+- The video `startupConfigs` are applied once at startup and left in place.
+
+### Preview
+
+| Setting | Description |
+|---------|-------------|
 | `preview.device` | V4L2 device path (e.g. "/dev/video0") |
 | `preview.width` | Preview resolution width |
 | `preview.height` | Preview resolution height |
@@ -81,6 +168,11 @@ Edit `config.json` to adjust camera and app settings:
 | `preview.crop.y` | Crop region Y offset in pixels |
 | `preview.crop.width` | Crop region width in pixels |
 | `preview.crop.height` | Crop region height in pixels |
+
+### App
+
+| Setting | Description |
+|---------|-------------|
 | `app.port` | Web server port |
 | `app.sessionsDir` | Directory for session folders |
 | `app.countdownSeconds` | Countdown before capture |
@@ -91,20 +183,56 @@ Edit `config.json` to adjust camera and app settings:
 | `app.enablePhone` | Show phone input on contact form (true/false) |
 | `app.mode` | "dev" or "prod" — dev allows F5/F11/F12/Ctrl+R/Ctrl+Shift+I and right-click |
 | `app.periodicAutofocus` | Trigger autofocus every 5s during active session (true/false) |
+| `app.video.enabled` | Enable the video-guestbook mode (true/false) |
+| `app.video.maxRecordSeconds` | Hard ceiling on a single take's duration |
+| `app.video.countdownSeconds` | Pre-recording countdown on the tablet |
+| `app.video.prompts` | List of prompt strings shown before each take |
+| `app.video.promptsPersistDuringRecording` | Keep the prompt on-screen while recording (true/false) |
+| `app.video.share.enabled` | Collect contact + show share/QR screen after video session (true/false) |
+| `app.video.share.upload` | Push downloaded takes to the gallery server (true/false) |
+| `app.video.share.uploadTiming` | "immediate" (upload right after Keep) or "onEnd" (batch on session end) |
+
+### Video guestbook
+
+When `app.video.enabled` is `true`, the idle screen adds a **Leave a Video Message** option
+alongside **Take Photos**. The guestbook flow is:
+
+1. Guest picks a prompt (or skips it) and taps **Start Recording**.
+2. A short countdown plays on the tablet. When it ends, the server starts the
+   camera's movie mode via gphoto2 (`--set-config movie=1`) and — if
+   `audioSource` is set — simultaneously records audio to the sessions folder
+   with ffmpeg.
+3. Guest taps the stop button. The server stops movie mode, locates the new
+   camera file, and muxes external audio (if any) on download.
+4. Guest chooses **Keep It** or **Record Again** and can take as many takes
+   as they want.
+5. When they tap **End Session**, optional contact info is collected and kept
+   takes can be uploaded to the gallery server.
+
+Local kept takes land in the session directory as `video_001.mov`,
+`video_002.mov`, … next to `metadata.json`. Discarded takes are not downloaded
+from the camera.
 
 ## Session Structure
 
-Each session creates a timestamped folder:
+Each session creates a timestamped folder (with a `_video` suffix for video
+sessions):
 
 ```
 sessions/
-└── 2026-04-09_22-52-00/
-    ├── IMG_001.jpg
-    ├── IMG_002.jpg
+├── 2026-04-09_22-52-00/
+│   ├── IMG_001.jpg
+│   ├── IMG_002.jpg
+│   └── metadata.json
+└── 2026-04-09_23-10-00_video/
+    ├── video_001.mov
+    ├── video_002.mov
     └── metadata.json
 ```
 
-`metadata.json` contains the contact info entered at session end.
+`metadata.json` contains the session type, contact info entered at session
+end, and — for video sessions — the list of takes with their prompts and
+upload status.
 
 ## Hardware Setup
 
