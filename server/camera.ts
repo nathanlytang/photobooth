@@ -257,6 +257,77 @@ function getMovieConfig() {
 }
 
 /**
+ * Read the current value of a gphoto2 config entry. Returns `null` if the
+ * value can't be read or parsed (e.g. the camera doesn't support querying it).
+ *
+ * gphoto2 `--get-config` output looks like:
+ *     Label: Movie
+ *     Readonly: 0
+ *     Type: TOGGLE
+ *     Current: 0
+ */
+async function readConfigValue(configPath: string): Promise<string | null> {
+  try {
+    const out = await gphoto2(['--get-config', configPath], 10000);
+    const m = out.match(/^Current:\s*(.+)$/m);
+    return m ? m[1].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Set a movie toggle (start or stop), tolerating gphoto2's "Invalid Status"
+ * false-positive that occurs *after* a successful state change on many bodies.
+ *
+ * Decision matrix on initial error:
+ *   - current === desiredValue   → success (camera already there)
+ *   - current === oppositeValue  → real failure → retry once
+ *   - anything else / unreadable → known false-positive on this body
+ */
+async function setMovieToggle(
+  label: 'start' | 'stop',
+  configPath: string,
+  desiredValue: string,
+  oppositeValue: string,
+): Promise<void> {
+  try {
+    await gphoto2(['--set-config', `${configPath}=${desiredValue}`], 10000);
+    return;
+  } catch (err) {
+    const errMsg = (err as Error).message;
+    const current = await readConfigValue(configPath);
+
+    if (current === desiredValue) {
+      console.warn(`[camera] Movie ${label}: gphoto2 errored but camera reports ${configPath}=${desiredValue}; treating as success.`);
+      return;
+    }
+
+    if (current !== null && current !== oppositeValue) {
+      console.warn(`[camera] Movie ${label}: gphoto2 errored, ${configPath}=${current} is not a known state; assuming false-positive and skipping retry.`);
+      return;
+    }
+
+    console.warn(`[camera] Movie ${label} failed (current=${current ?? 'unknown'}), retrying in 500ms:`, errMsg);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    try {
+      await gphoto2(['--set-config', `${configPath}=${desiredValue}`], 10000);
+    } catch (err2) {
+      const current2 = await readConfigValue(configPath);
+      if (current2 === desiredValue) {
+        console.warn(`[camera] Movie ${label} retry errored but camera is at ${configPath}=${desiredValue}; treating as success.`);
+        return;
+      }
+      if (current2 !== null && current2 !== oppositeValue) {
+        console.warn(`[camera] Movie ${label} retry errored, ${configPath}=${current2} unrecognized; assuming false-positive.`);
+        return;
+      }
+      throw err2;
+    }
+  }
+}
+
+/**
  * Apply any pre-configs (e.g. switching the camera into movie mode) and then
  * issue the movie-start command. Serialized through the USB mutex.
  */
@@ -265,23 +336,17 @@ export async function movieStart(): Promise<void> {
   // `camera.video.startupConfigs` (if any) are applied once at video session
   // start, not per-recording — so this is just the bare movie-start toggle.
   console.log('[camera] Starting movie recording...');
-  await gphoto2(['--set-config', `${movie.startConfigPath}=${movie.startValue}`], 15000);
+  await setMovieToggle('start', movie.startConfigPath, movie.startValue, movie.stopValue);
   console.log('[camera] Movie recording started');
 }
 
 /**
- * Stop the current movie recording. Retries once on transient USB errors.
+ * Stop the current movie recording. Tolerates camera-already-stopped states.
  */
 export async function movieStop(): Promise<void> {
   const movie = getMovieConfig();
   console.log('[camera] Stopping movie recording...');
-  try {
-    await gphoto2(['--set-config', `${movie.stopConfigPath}=${movie.stopValue}`], 15000);
-  } catch (err) {
-    console.warn('[camera] Movie stop failed, retrying in 500ms:', (err as Error).message);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    await gphoto2(['--set-config', `${movie.stopConfigPath}=${movie.stopValue}`], 15000);
-  }
+  await setMovieToggle('stop', movie.stopConfigPath, movie.stopValue, movie.startValue);
   console.log('[camera] Movie recording stopped');
 }
 
