@@ -75,6 +75,25 @@
         "quality": 85
       }
     },
+    "notifications": {
+      "from": { "email": "Photobooth <noreply@example.com>", "sms": "+15555550123" },
+      "subject": "Your photos from {eventName}",
+      "emailTemplate": "<p>Thanks for stopping by{eventNameSuffix}!</p><p>Your photos: <a href=\"{shareUrl}\">{shareUrl}</a></p>",
+      "smsTemplate": "Your photos{eventNameSuffix}:\n{shareUrl}",
+      "smtp": { "host": "", "port": 587, "secure": false, "user": "", "pass": "" },
+      "twilio": { "accountSid": "", "authToken": "", "from": "+15555550123" },
+      "options": {
+        "channel": "preferEmail",
+        "deleteAfterSend": false,
+        "skipAlreadySent": true,
+        "skipVideoSessions": false,
+        "maxAgeDays": 0,
+        "dryRun": false,
+        "continueOnError": true,
+        "mode": "all",
+        "retryQueuePath": "./scripts/sendShares.retry.json"
+      }
+    },
     "video": {
       "enabled": false,
       "maxRecordSeconds": 60,

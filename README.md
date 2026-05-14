@@ -192,6 +192,54 @@ out of movie mode per session. When enabled:
 | `app.video.share.upload` | Push downloaded takes to the gallery server (true/false) |
 | `app.video.share.uploadTiming` | "immediate" (upload right after Keep) or "onEnd" (batch on session end) |
 
+### Notifications (share notifier script)
+
+The `pnpm notify` script scans the sessions directory, sends each session's
+`shareUrl` to its captured contact via email and/or SMS, marks
+`metadata.contact.sent` on success, and (optionally) deletes the local
+session folder. Failed sends and skips for actionable reasons are queued to a
+JSON file so they can be retried.
+
+```bash
+pnpm notify   # uses values from app.notifications in config.json
+```
+
+All script behavior is configured through `app.notifications` in `config.json`
+(also editable from the **Notifications** tab in the admin panel).
+
+| Setting | Description |
+|---------|-------------|
+| `app.notifications.from.email` | RFC-2822 from-line for outbound mail (e.g. `Photobooth <noreply@example.com>`). |
+| `app.notifications.from.sms` | Default SMS sender label (unused if Twilio's `from` is set, which is required). |
+| `app.notifications.subject` | Email subject template. Supports `{eventName}`. |
+| `app.notifications.emailTemplate` | Email body as **HTML** (multiline allowed). Plain-text fallback is auto-derived. Supports `{shareUrl}`, `{eventName}`, `{eventNameSuffix}`. |
+| `app.notifications.smsTemplate` | SMS body as plain text (multiline allowed). Same placeholders as `emailTemplate`. |
+| `app.notifications.smtp.host` / `port` / `secure` / `user` / `pass` | SMTP server for outbound email (via nodemailer). `secure=true` for implicit TLS on 465; leave off for STARTTLS on 587. |
+| `app.notifications.twilio.accountSid` / `authToken` / `from` | Twilio credentials and E.164 from-number for SMS. |
+| `app.notifications.options.channel` | `preferEmail` (default), `preferSms`, `email`, `sms`, or `both`. |
+| `app.notifications.options.deleteAfterSend` | When `true`, deletes the local session folder after at least one channel succeeds. Does **not** affect the gallery server. |
+| `app.notifications.options.skipAlreadySent` | Skip sessions whose `metadata.contact.sent.sent === true` (default `true`). |
+| `app.notifications.options.skipVideoSessions` | Skip sessions whose `type === "video"` (default `false`). |
+| `app.notifications.options.maxAgeDays` | Only process sessions ended within the last N days. `0` = no limit. |
+| `app.notifications.options.dryRun` | Run full validation but no sends, metadata writes, or deletes. |
+| `app.notifications.options.continueOnError` | Keep processing on failure (default `true`). Off = abort on first failure. |
+| `app.notifications.options.mode` | `all` scans `sessionsDir`. `retry` re-processes only the entries in the retry queue (useful after fixing bad contact info). |
+| `app.notifications.options.retryQueuePath` | Path to the persisted skip/failure queue (default `./scripts/sendShares.retry.json`). |
+
+**Template placeholders:**
+- `{shareUrl}` — the per-session gallery URL.
+- `{eventName}` — value of `app.eventName` (empty string if unset).
+- `{eventNameSuffix}` — `" from <eventName>"` when set, empty otherwise. Handy for natural phrasing without conditionals.
+
+**Outcomes & retry queue.** Each session ends in one of `sent`, `failed`, or
+`skipped:<reason>` (reasons: `already-sent`, `no-share-url`, `video-session`,
+`no-contact`, `invalid-email`, `invalid-phone`, `channel-unavailable`,
+`provider-unconfigured`, `too-old`, `bad-metadata`). Outcomes are printed
+per-session and grouped in a final summary. Failures and actionable skips
+(invalid contact info, unconfigured provider, missing metadata, etc.) are
+written to the retry queue file; successful sends remove the entry. Set
+`options.mode` to `retry` to re-process only those entries.
+
 ### Video guestbook
 
 When `app.video.enabled` is `true`, the idle screen adds a **Leave a Video Message** option

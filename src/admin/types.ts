@@ -107,6 +107,45 @@ export interface AdminConfig {
   sessionTtlMinutes: number;
 }
 
+export interface NotificationsSmtpConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  user?: string;
+  pass?: string;
+}
+
+export interface NotificationsTwilioConfig {
+  accountSid: string;
+  authToken: string;
+  from: string;
+}
+
+export type NotificationsChannel = 'email' | 'sms' | 'both' | 'preferEmail' | 'preferSms';
+export type NotificationsMode = 'all' | 'retry';
+
+export interface NotificationsOptions {
+  channel?: NotificationsChannel;
+  deleteAfterSend?: boolean;
+  skipAlreadySent?: boolean;
+  skipVideoSessions?: boolean;
+  maxAgeDays?: number;
+  dryRun?: boolean;
+  continueOnError?: boolean;
+  mode?: NotificationsMode;
+  retryQueuePath?: string;
+}
+
+export interface NotificationsConfig {
+  from?: { email?: string; sms?: string };
+  subject?: string;
+  emailTemplate?: string;
+  smsTemplate?: string;
+  smtp?: NotificationsSmtpConfig;
+  twilio?: NotificationsTwilioConfig;
+  options?: NotificationsOptions;
+}
+
 export interface AppConfig {
   port: number;
   sessionsDir: string;
@@ -122,6 +161,7 @@ export interface AppConfig {
   periodicAutofocus?: boolean;
   galleryServer?: GalleryServerConfig;
   video?: VideoConfig;
+  notifications?: NotificationsConfig;
 }
 
 export interface PhotoboothConfig {

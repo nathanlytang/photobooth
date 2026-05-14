@@ -7,6 +7,7 @@ import CameraTab from './tabs/CameraTab';
 import PreviewTab from './tabs/PreviewTab';
 import GalleryTab from './tabs/GalleryTab';
 import VideoTab from './tabs/VideoTab';
+import NotificationsTab from './tabs/NotificationsTab';
 import AdminTab from './tabs/AdminTab';
 import AdvancedTab from './tabs/AdvancedTab';
 import RestartDialog from './RestartDialog';
@@ -92,6 +93,7 @@ export default function AdminPanel({ initialConfig, onLogout }: AdminPanelProps)
                 <TabsTrigger value="preview">Preview</TabsTrigger>
                 <TabsTrigger value="gallery">Gallery</TabsTrigger>
                 <TabsTrigger value="video">Video</TabsTrigger>
+                <TabsTrigger value="notifications">Notifications</TabsTrigger>
                 <TabsTrigger value="admin">Admin</TabsTrigger>
                 <TabsTrigger value="advanced">Advanced</TabsTrigger>
               </TabsList>
@@ -110,6 +112,9 @@ export default function AdminPanel({ initialConfig, onLogout }: AdminPanelProps)
               </TabsContent>
               <TabsContent value="video">
                 <VideoTab config={draft} onChange={handleChange} />
+              </TabsContent>
+              <TabsContent value="notifications">
+                <NotificationsTab config={draft} onChange={handleChange} />
               </TabsContent>
               <TabsContent value="admin">
                 <AdminTab config={draft} onChange={handleChange} />
