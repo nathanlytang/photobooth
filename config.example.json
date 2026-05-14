@@ -100,5 +100,9 @@
         "uploadTiming": "immediate"
       }
     }
+  },
+  "admin": {
+    "password": "change-me-to-a-secure-random-token",
+    "sessionTtlMinutes": 240
   }
 }

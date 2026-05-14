@@ -146,6 +146,11 @@ export interface VideoConfig {
   share?: VideoShareConfig;
 }
 
+export interface AdminConfig {
+  password: string;
+  sessionTtlMinutes: number;
+}
+
 export interface AppConfig {
   port: number;
   sessionsDir: string;
@@ -167,6 +172,7 @@ export interface PhotoboothConfig {
   camera: CameraConfig;
   preview: PreviewConfig;
   app: AppConfig;
+  admin: AdminConfig;
 }
 
 // --- Session Types ---

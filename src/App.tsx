@@ -175,6 +175,12 @@ export default function App() {
         break;
       }
 
+      case 'config:updated': {
+        console.log('[config] Server config updated — reloading');
+        window.location.reload();
+        break;
+      }
+
       case 'error': {
         console.error('[server] Error:', msg.payload.message);
         state.setIsCapturing(false);

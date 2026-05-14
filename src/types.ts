@@ -150,6 +150,7 @@ export type WsServerMessage =
   | { type: 'video:download-complete'; payload: VideoDownloadCompletePayload }
   | { type: 'video:session:ended'; payload: SessionEndedPayload }
   | { type: 'video:error'; payload: VideoErrorPayload }
+  | { type: 'config:updated'; payload: Record<string, never> }
   | { type: 'error'; payload: ErrorPayload };
 
 // --- App Screen State ---

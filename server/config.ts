@@ -1,14 +1,19 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { EventEmitter } from 'events';
 import type { PhotoboothConfig } from './types.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
+const CONFIG_BACKUP_PATH = path.join(__dirname, '..', 'config.json.bak');
 
 let config: PhotoboothConfig | null = null;
+const emitter = new EventEmitter();
+
+export const events = emitter;
 
 export function load(): PhotoboothConfig {
   if (!fs.existsSync(CONFIG_PATH)) {
@@ -30,10 +35,38 @@ export function load(): PhotoboothConfig {
   }
 }
 
+export function reload(): PhotoboothConfig {
+  if (!fs.existsSync(CONFIG_PATH)) {
+    throw new Error('config.json not found');
+  }
+  const raw = fs.readFileSync(CONFIG_PATH, 'utf-8');
+  const next = JSON.parse(raw) as PhotoboothConfig;
+  validate(next);
+  const prev = config;
+  config = next;
+  console.log('[config] Reloaded config.json');
+  emitter.emit('change', { prev, next, path: CONFIG_PATH });
+  return config;
+}
+
+export function save(next: PhotoboothConfig): void {
+  validate(next);
+  const raw = JSON.stringify(next, null, 2);
+  // Atomic write with backup
+  if (fs.existsSync(CONFIG_PATH)) {
+    fs.copyFileSync(CONFIG_PATH, CONFIG_BACKUP_PATH);
+  }
+  const tmpPath = `${CONFIG_PATH}.tmp`;
+  fs.writeFileSync(tmpPath, raw, 'utf-8');
+  fs.renameSync(tmpPath, CONFIG_PATH);
+  reload();
+}
+
 function validate(cfg: PhotoboothConfig): void {
   if (!cfg.camera) throw new Error('Missing "camera" section in config');
   if (!cfg.preview) throw new Error('Missing "preview" section in config');
   if (!cfg.app) throw new Error('Missing "app" section in config');
+  if (!cfg.admin) throw new Error('Missing "admin" section in config');
 
   const requiredCamera = ['iso', 'shutterSpeed', 'aperture', 'captureTarget'] as const;
   for (const key of requiredCamera) {
@@ -66,6 +99,14 @@ function validate(cfg: PhotoboothConfig): void {
     if (cfg.app[key] === undefined) {
       throw new Error(`Missing app.${key} in config`);
     }
+  }
+
+  // Validate admin section
+  if (!cfg.admin.password || typeof cfg.admin.password !== 'string') {
+    throw new Error('Missing or invalid admin.password in config');
+  }
+  if (typeof cfg.admin.sessionTtlMinutes !== 'number' || cfg.admin.sessionTtlMinutes <= 0) {
+    throw new Error('admin.sessionTtlMinutes must be a positive number');
   }
 
   // Validate galleryServer if enabled

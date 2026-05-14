@@ -11,6 +11,7 @@ import * as camera from './camera.js';
 import * as session from './session.js';
 import * as gallery from './gallery.js';
 import * as video from './video.js';
+import adminRouter from './admin.js';
 import type {
   ContactInfo,
   FrontendConfig,
@@ -58,6 +59,7 @@ fs.mkdirSync(sessionsDir, { recursive: true });
 // Express app
 const app = express();
 app.use(express.json());
+app.use('/api/admin', adminRouter);
 
 // In production, serve the Vite build output
 const distPath = path.join(__dirname, '..', 'dist');
@@ -70,8 +72,9 @@ app.use('/sessions', express.static(sessionsDir));
 
 // REST endpoint to get current config (non-sensitive, for frontend countdown value etc.)
 app.get('/api/config', (_req, res) => {
-  const gs = cfg.app.galleryServer;
-  const v = cfg.app.video;
+  const c = config.get();
+  const gs = c.app.galleryServer;
+  const v = c.app.video;
   const videoConfig: FrontendVideoConfig = {
     enabled: !!(v && v.enabled),
     maxRecordSeconds: v?.maxRecordSeconds ?? 60,
@@ -82,14 +85,14 @@ app.get('/api/config', (_req, res) => {
     shareEnabled: !!(v?.share?.enabled),
   };
   const frontendConfig: FrontendConfig = {
-    countdownSeconds: cfg.app.countdownSeconds,
-    cameraPosition: cfg.app.cameraPosition || 'above',
-    lookText: cfg.app.lookText || 'Look up here!',
-    enableEmail: cfg.app.enableEmail !== false,
-    enablePhone: cfg.app.enablePhone !== false,
-    mode: cfg.app.mode || 'prod',
-    crop: cfg.preview.crop || null,
-    shutterOffsetMs: cfg.app.shutterOffsetMs || 0,
+    countdownSeconds: c.app.countdownSeconds,
+    cameraPosition: c.app.cameraPosition || 'above',
+    lookText: c.app.lookText || 'Look up here!',
+    enableEmail: c.app.enableEmail !== false,
+    enablePhone: c.app.enablePhone !== false,
+    mode: c.app.mode || 'prod',
+    crop: c.preview.crop || null,
+    shutterOffsetMs: c.app.shutterOffsetMs || 0,
     galleryEnabled: !!(gs && gs.enabled),
     video: videoConfig,
   };
@@ -188,7 +191,7 @@ wss.on('connection', (ws: WebSocket) => {
             break;
           }
 
-          send(ws, 'capture:countdown', { seconds: cfg.app.countdownSeconds });
+          send(ws, 'capture:countdown', { seconds: config.get().app.countdownSeconds });
 
           // Wait for countdown on the client side, then trigger
           // The client sends 'capture:trigger' after countdown completes
@@ -309,7 +312,7 @@ wss.on('connection', (ws: WebSocket) => {
           pendingStartPrompt = typeof p.prompt === 'string' ? p.prompt : null;
           pendingStartArmed = true;
           send(ws, 'video:countdown', {
-            seconds: cfg.app.video?.countdownSeconds ?? 3,
+            seconds: config.get().app.video?.countdownSeconds ?? 3,
           });
           break;
         }
@@ -332,7 +335,7 @@ wss.on('connection', (ws: WebSocket) => {
             send(ws, 'video:error', { message: 'No active session' });
             break;
           }
-          const movieCfg = cfg.camera.movie;
+          const movieCfg = config.get().camera.movie;
           const ext = movieCfg?.fileExtension || 'mov';
           try {
             const take = session.beginVideoTake(chosenPrompt, ext);
@@ -340,7 +343,7 @@ wss.on('connection', (ws: WebSocket) => {
             videoRecordingState = state;
             videoRecordingActive = true;
 
-            const maxSeconds = cfg.app.video?.maxRecordSeconds ?? 60;
+            const maxSeconds = config.get().app.video?.maxRecordSeconds ?? 60;
             send(ws, 'video:recording-started', {
               takeNumber: take.takeNumber,
               startedAt: state.startedAt,
@@ -478,24 +481,25 @@ function send(ws: WebSocket, type: string, payload: unknown): void {
 // --- Video helpers ---
 
 function isVideoEnabled(): boolean {
-  return !!cfg.app.video && cfg.app.video.enabled === true;
+  const c = config.get();
+  return !!c.app.video && c.app.video.enabled === true;
 }
 
 /** Is the gallery share flow active for the current video session? */
 function isVideoShareActive(): boolean {
-  const v = cfg.app.video;
+  const v = config.get().app.video;
   return !!(v && v.enabled && v.share && v.share.enabled);
 }
 
 function shouldUploadImmediately(): boolean {
-  const v = cfg.app.video;
+  const v = config.get().app.video;
   if (!v?.share?.enabled || !v.share.upload) return false;
   const timing = v.share.uploadTiming || 'immediate';
   return timing === 'immediate' && gallery.isEnabled();
 }
 
 function shouldUploadOnEnd(): boolean {
-  const v = cfg.app.video;
+  const v = config.get().app.video;
   if (!v?.share?.enabled || !v.share.upload) return false;
   const timing = v.share.uploadTiming || 'immediate';
   return timing === 'onEnd' && gallery.isEnabled();
@@ -618,7 +622,7 @@ async function runVideoUpload(take: VideoTake, ws: WebSocket): Promise<void> {
     return;
   }
 
-  const v = cfg.app.video;
+  const v = config.get().app.video;
   if (!v?.share?.enabled) return;
   if (!v.share.upload) {
     session.updateTake(take.takeNumber, { uploadSkipped: true });
@@ -722,7 +726,7 @@ function shutdown(): void {
 }
 
 function startAutofocusLoop(): void {
-  if (cfg.app.periodicAutofocus === false) return;
+  if (config.get().app.periodicAutofocus === false) return;
   stopAutofocusLoop();
   autofocusInterval = setInterval(() => {
     if (session.getActive()) {
@@ -739,6 +743,34 @@ function stopAutofocusLoop(): void {
     console.log('[server] Autofocus loop stopped');
   }
 }
+
+// React to live config changes
+config.events.on('change', ({ prev, next }) => {
+  const pPrev = JSON.stringify(prev.preview);
+  const pNext = JSON.stringify(next.preview);
+  if (pPrev !== pNext) {
+    console.log('[config] Preview config changed — restarting preview');
+    preview.stop();
+    preview.start();
+  }
+
+  const afPrev = prev.app.periodicAutofocus;
+  const afNext = next.app.periodicAutofocus;
+  if (afPrev !== afNext) {
+    if (afNext) {
+      console.log('[config] periodicAutofocus enabled — starting loop');
+      startAutofocusLoop();
+    } else {
+      console.log('[config] periodicAutofocus disabled — stopping loop');
+      stopAutofocusLoop();
+    }
+  }
+
+  // Notify all connected kiosk clients to reload so UI reflects new config.
+  for (const ws of wss.clients) {
+    send(ws, 'config:updated', {});
+  }
+});
 
 // Catch-all error handlers — log before pm2 restarts the process
 process.on('uncaughtException', (err) => {
