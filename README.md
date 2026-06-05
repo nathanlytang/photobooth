@@ -192,23 +192,44 @@ out of movie mode per session. When enabled:
 | `app.video.share.upload` | Push downloaded takes to the gallery server (true/false) |
 | `app.video.share.uploadTiming` | "immediate" (upload right after Keep) or "onEnd" (batch on session end) |
 
-### Notifications (share notifier script)
+### Notifications (service + script)
 
-The `pnpm notify` script scans the sessions directory, sends each session's
-`shareUrl` to its captured contact via email and/or SMS, marks
-`metadata.contact.sent` on success, and (optionally) deletes the local
-session folder. Failed sends and skips for actionable reasons are queued to a
-JSON file so they can be retried.
+Photobooth ships with a **notification service** that runs inside the main
+server and sends each session's `shareUrl` to its contact via email and/or
+SMS as soon as the session ends. The same engine is also exposed as a
+one-shot CLI script for manual backfills.
+
+**Service (long-running, in-server).** When `app.notifications.enabled` is
+`true`, the server:
+
+1. (Optional) sweeps the sessions directory once at startup so anything that
+   ended while the service was off still gets notified.
+2. Subscribes to a `session:ended` event and processes each new session with
+   a short (~5s) debounce, well under any 5-minute SLA.
+3. Marks `metadata.contact.sent` on success and (optionally) deletes the
+   local session folder. Failures and actionable skips go to the retry
+   queue file.
+
+Toggling `enabled` in the admin panel starts/stops the service live without
+restarting the server.
+
+**Script (manual one-shot).**
 
 ```bash
 pnpm notify   # uses values from app.notifications in config.json
 ```
 
-All script behavior is configured through `app.notifications` in `config.json`
-(also editable from the **Notifications** tab in the admin panel).
+The script ignores the `enabled` flag — it always runs when invoked.
+Behavior is governed by `app.notifications.options.mode`:
+- `all` (default) — scan the sessions directory.
+- `retry` — re-process only sessions in the retry queue file.
+
+All configuration lives under `app.notifications` in `config.json` (also
+editable from the **Notifications** tab in the admin panel).
 
 | Setting | Description |
 |---------|-------------|
+| `app.notifications.enabled` | Master toggle for the in-server notification service. The script ignores this. Defaults to `false`. |
 | `app.notifications.from.email` | RFC-2822 from-line for outbound mail (e.g. `Photobooth <noreply@example.com>`). |
 | `app.notifications.from.sms` | Default SMS sender label (unused if Twilio's `from` is set, which is required). |
 | `app.notifications.subject` | Email subject template. Supports `{eventName}`. |
@@ -221,10 +242,11 @@ All script behavior is configured through `app.notifications` in `config.json`
 | `app.notifications.options.skipAlreadySent` | Skip sessions whose `metadata.contact.sent.sent === true` (default `true`). |
 | `app.notifications.options.skipVideoSessions` | Skip sessions whose `type === "video"` (default `false`). |
 | `app.notifications.options.maxAgeDays` | Only process sessions ended within the last N days. `0` = no limit. |
-| `app.notifications.options.dryRun` | Run full validation but no sends, metadata writes, or deletes. |
-| `app.notifications.options.continueOnError` | Keep processing on failure (default `true`). Off = abort on first failure. |
-| `app.notifications.options.mode` | `all` scans `sessionsDir`. `retry` re-processes only the entries in the retry queue (useful after fixing bad contact info). |
-| `app.notifications.options.retryQueuePath` | Path to the persisted skip/failure queue (default `./scripts/sendShares.retry.json`). |
+| `app.notifications.options.dryRun` | Run full validation but no sends, metadata writes, or deletes. Applies to both service and script. |
+| `app.notifications.options.continueOnError` | Keep processing on failure (default `true`). Off = abort on first failure. Script only. |
+| `app.notifications.options.mode` | Script only. `all` scans `sessionsDir`. `retry` re-processes only the entries in the retry queue (useful after fixing bad contact info). |
+| `app.notifications.options.retryQueuePath` | Path to the persisted skip/failure queue (default `./scripts/sendShares.retry.json`). Shared between service and script. |
+| `app.notifications.options.runInitialSweep` | When the service starts (or is toggled on), scan all existing sessions once. Default `true`. Set to `false` if you only want to handle newly ended sessions. Does not affect the script. |
 
 **Template placeholders:**
 - `{shareUrl}` — the per-session gallery URL.

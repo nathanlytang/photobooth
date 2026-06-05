@@ -1,4 +1,4 @@
-import type { ContactSentAttempt, ContactSentMethod } from '../../server/types.js';
+import type { ContactSentAttempt, ContactSentMethod } from '../types.js';
 
 export type Channel = 'email' | 'sms' | 'both' | 'preferEmail' | 'preferSms';
 export type Mode = 'all' | 'retry';
@@ -13,6 +13,7 @@ export interface NotifyOptions {
   continueOnError: boolean;
   mode: Mode;
   retryQueuePath: string;
+  runInitialSweep: boolean;
 }
 
 export type SkipReason =

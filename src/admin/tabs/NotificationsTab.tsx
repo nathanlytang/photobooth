@@ -58,10 +58,28 @@ export default function NotificationsTab({ config, onChange }: Props) {
       <div className="space-y-2">
         <h3 className="text-sm font-semibold">Share Notifications</h3>
         <p className="text-xs text-zinc-500">
-          Settings for the <code>pnpm notify</code> script that emails or texts each session's gallery
-          link. The script reads these values from <code>config.json</code>; saving here will take
-          effect on the next run. Changes here do not send any messages by themselves.
+          Settings for the in-server <em>notification service</em> and the <code>pnpm notify</code>
+          {' '}script. Both share these credentials and templates. The service watches for
+          completed sessions and sends gallery links automatically; the script is a manual
+          one-shot run that ignores the enable toggle below.
         </p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border p-4">
+        <label className="flex items-start gap-2">
+          <Switch
+            checked={n.enabled === true}
+            onCheckedChange={(v) => updateN({ enabled: v })}
+          />
+          <span className="flex flex-col">
+            <span className="text-sm font-medium">Enable Notification Service</span>
+            <span className="text-xs text-zinc-500">
+              When on, the server sends notifications automatically as sessions end (with a small
+              debounce). Toggling here starts/stops the service live without restarting the server.
+              The <code>pnpm notify</code> script always runs regardless of this toggle.
+            </span>
+          </span>
+        </label>
       </div>
 
       <div className="space-y-3 rounded-lg border p-4">
@@ -223,11 +241,12 @@ export default function NotificationsTab({ config, onChange }: Props) {
       </div>
 
       <div className="space-y-3 rounded-lg border p-4">
-        <h4 className="text-sm font-medium">Script Options</h4>
+        <h4 className="text-sm font-medium">Delivery Behavior</h4>
         <p className="text-xs text-zinc-500">
-          Behavior of <code>pnpm notify</code>. Defaults are sensible; toggle <em>Dry Run</em> to
-          preview a run, or switch <em>Mode</em> to <em>retry</em> to re-process only sessions in{' '}
-          <code>scripts/sendShares.retry.json</code>.
+          How notifications are selected and delivered. These settings apply to <strong>both</strong>
+          {' '}the in-server notification service and the <code>pnpm notify</code> script, so the two
+          stay in lockstep. Toggle <em>Dry Run</em> to preview a run without sending or modifying
+          anything.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
@@ -243,17 +262,7 @@ export default function NotificationsTab({ config, onChange }: Props) {
               <option value="sms">SMS only</option>
               <option value="both">both (send via every available channel)</option>
             </select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Mode</Label>
-            <select
-              className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
-              value={options.mode ?? 'all'}
-              onChange={(e) => updateOptions({ mode: e.target.value as NotificationsOptions['mode'] })}
-            >
-              <option value="all">all (scan sessions directory)</option>
-              <option value="retry">retry (only entries in retry queue)</option>
-            </select>
+            <p className="text-xs text-zinc-500">Which channels to use, given what's in the contact metadata.</p>
           </div>
           <div className="space-y-1.5">
             <Label>Max Age (days)</Label>
@@ -267,14 +276,17 @@ export default function NotificationsTab({ config, onChange }: Props) {
             />
             <p className="text-xs text-zinc-500">Only process sessions ended within the last N days. 0 = no limit.</p>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 sm:col-span-2">
             <Label>Retry Queue Path</Label>
             <Input
               value={options.retryQueuePath ?? ''}
               placeholder="./scripts/sendShares.retry.json"
               onChange={(e) => updateOptions({ retryQueuePath: e.target.value })}
             />
-            <p className="text-xs text-zinc-500">Relative to repo root or absolute. Stores skipped/failed sessions.</p>
+            <p className="text-xs text-zinc-500">
+              Where skipped/failed sessions are recorded. Relative to repo root or absolute.
+              Shared between the service and script so retries pick up where either left off.
+            </p>
           </div>
 
           <label className="flex items-start gap-2">
@@ -317,7 +329,56 @@ export default function NotificationsTab({ config, onChange }: Props) {
               <span className="text-xs text-zinc-500">Delete the local session folder after a successful send. Does not touch the gallery server.</span>
             </span>
           </label>
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-lg border p-4">
+        <h4 className="text-sm font-medium">Service Behavior</h4>
+        <p className="text-xs text-zinc-500">
+          Settings that only affect the in-server notification service (the long-running watcher).
+          Ignored by <code>pnpm notify</code>.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
           <label className="flex items-start gap-2 sm:col-span-2">
+            <Switch
+              checked={options.runInitialSweep !== false}
+              onCheckedChange={(v) => updateOptions({ runInitialSweep: v })}
+            />
+            <span className="flex flex-col">
+              <span className="text-sm font-medium">Run Initial Sweep</span>
+              <span className="text-xs text-zinc-500">
+                On service start (and when it's toggled on), scan all existing sessions once to
+                catch any that ended while the service was off. Turn this off to only handle
+                newly ended sessions going forward.
+              </span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <div className="space-y-3 rounded-lg border p-4">
+        <h4 className="text-sm font-medium">Script Behavior</h4>
+        <p className="text-xs text-zinc-500">
+          Settings that only affect manual <code>pnpm notify</code> runs. Ignored by the in-server
+          service.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label>Mode</Label>
+            <select
+              className="flex h-9 w-full rounded-md border border-zinc-200 bg-white px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-zinc-400"
+              value={options.mode ?? 'all'}
+              onChange={(e) => updateOptions({ mode: e.target.value as NotificationsOptions['mode'] })}
+            >
+              <option value="all">all (scan sessions directory)</option>
+              <option value="retry">retry (only entries in retry queue)</option>
+            </select>
+            <p className="text-xs text-zinc-500">
+              Switch to <em>retry</em> to re-process only sessions in the retry queue file
+              (useful after fixing bad contact info or credentials).
+            </p>
+          </div>
+          <label className="flex items-start gap-2">
             <Switch
               checked={options.continueOnError !== false}
               onCheckedChange={(v) => updateOptions({ continueOnError: v })}

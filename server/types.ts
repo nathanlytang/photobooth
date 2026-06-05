@@ -178,9 +178,13 @@ export interface NotificationsOptions {
   continueOnError?: boolean;
   mode?: NotificationsMode;
   retryQueuePath?: string;
+  /** Whether the in-server watcher should sweep the sessions dir on startup. */
+  runInitialSweep?: boolean;
 }
 
 export interface NotificationsConfig {
+  /** Master toggle for the in-server notification watcher. The `pnpm notify` script ignores this. */
+  enabled?: boolean;
   from?: { email?: string; sms?: string };
   subject?: string;
   emailTemplate?: string;

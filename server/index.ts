@@ -11,6 +11,7 @@ import * as camera from './camera.js';
 import * as session from './session.js';
 import * as gallery from './gallery.js';
 import * as video from './video.js';
+import * as notifications from './notifications/service.js';
 import adminRouter from './admin.js';
 import type {
   ContactInfo,
@@ -710,6 +711,9 @@ async function init(): Promise<void> {
   server.listen(cfg.app.port, () => {
     console.log(`[server] Photobooth running at http://localhost:${cfg.app.port}`);
   });
+
+  // Start notification service if enabled in config (no-op when disabled).
+  notifications.start();
 }
 
 // Graceful shutdown
@@ -763,6 +767,19 @@ config.events.on('change', ({ prev, next }) => {
     } else {
       console.log('[config] periodicAutofocus disabled — stopping loop');
       stopAutofocusLoop();
+    }
+  }
+
+  // React to notification-service enable toggle.
+  const nPrev = prev.app.notifications?.enabled === true;
+  const nNext = next.app.notifications?.enabled === true;
+  if (nPrev !== nNext) {
+    if (nNext) {
+      console.log('[config] notifications.enabled=true — starting service');
+      notifications.start();
+    } else {
+      console.log('[config] notifications.enabled=false — stopping service');
+      notifications.stop();
     }
   }
 

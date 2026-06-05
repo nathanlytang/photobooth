@@ -76,6 +76,7 @@
       }
     },
     "notifications": {
+      "enabled": false,
       "from": { "email": "Photobooth <noreply@example.com>", "sms": "+15555550123" },
       "subject": "Your photos from {eventName}",
       "emailTemplate": "<p>Thanks for stopping by{eventNameSuffix}!</p><p>Your photos: <a href=\"{shareUrl}\">{shareUrl}</a></p>",
@@ -91,7 +92,8 @@
         "dryRun": false,
         "continueOnError": true,
         "mode": "all",
-        "retryQueuePath": "./scripts/sendShares.retry.json"
+        "retryQueuePath": "./scripts/sendShares.retry.json",
+        "runInitialSweep": true
       }
     },
     "video": {

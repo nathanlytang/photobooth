@@ -6,7 +6,7 @@ import type {
   NotificationsConfig,
   NotificationsSmtpConfig,
   NotificationsTwilioConfig,
-} from '../server/types.js';
+} from '../types.js';
 
 export interface NotificationMessage {
   subject?: string;

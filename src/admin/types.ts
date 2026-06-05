@@ -134,9 +134,11 @@ export interface NotificationsOptions {
   continueOnError?: boolean;
   mode?: NotificationsMode;
   retryQueuePath?: string;
+  runInitialSweep?: boolean;
 }
 
 export interface NotificationsConfig {
+  enabled?: boolean;
   from?: { email?: string; sms?: string };
   subject?: string;
   emailTemplate?: string;

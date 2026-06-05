@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { EventEmitter } from 'events';
 import { customAlphabet } from 'nanoid';
 
 const nanoid = customAlphabet('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz');
@@ -15,6 +16,20 @@ import type {
 } from './types.js';
 
 let currentSession: Session | null = null;
+
+/**
+ * Session lifecycle events.
+ * - `'ended'` fires after `metadata.json` is written and the session is reset.
+ *   Payload: `{ id, dir, type, metadata }`.
+ */
+export const events = new EventEmitter();
+
+export interface SessionEndedEvent {
+  id: string;
+  dir: string;
+  type: SessionType;
+  metadata: SessionMetadata;
+}
 
 function formatTimestamp(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -204,7 +219,17 @@ export function end(contactInfo: ContactInfo): SessionEndResult {
   const type = currentSession.type;
   const shareId = currentSession.shareId;
   const shareUrl = currentSession.shareUrl;
+  const sessionDir = currentSession.dir;
   currentSession = null;
+
+  // Notify subscribers (e.g. notification service) that this session is done.
+  // Emit synchronously after state is reset so handlers can re-enter safely.
+  try {
+    const evt: SessionEndedEvent = { id: sessionId, dir: sessionDir, type, metadata };
+    events.emit('ended', evt);
+  } catch (err) {
+    console.warn('[session] events.emit("ended") handler threw:', (err as Error).message);
+  }
 
   return { id: sessionId, type, shareId, shareUrl, metadata };
 }

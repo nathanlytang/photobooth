@@ -1,13 +1,13 @@
 import fs from 'fs';
 import path from 'path';
-import * as config from '../../server/config.js';
+import * as config from '../config.js';
 import type {
   SessionMetadata,
   ContactSentInfo,
   ContactSentAttempt,
   ContactSentMethod,
-} from '../../server/types.js';
-import type { NotificationProvider } from '../providers.js';
+} from '../types.js';
+import type { NotificationProvider } from './providers.js';
 import type { NotifyOptions, SessionResult } from './types.js';
 import {
   htmlToText,
