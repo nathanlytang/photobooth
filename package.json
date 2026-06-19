@@ -22,7 +22,7 @@
   "dependencies": {
     "express": "^4.21.0",
     "nanoid": "^3.3.11",
-    "nodemailer": "^8.0.7",
+    "nodemailer": "^9.0.1",
     "react-simple-wysiwyg": "^3.4.1",
     "ws": "^8.18.0"
   },
