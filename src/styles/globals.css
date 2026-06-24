@@ -11,6 +11,22 @@
     U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+@font-face {
+  font-family: "Italianno";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("/fonts/Italianno-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Cormorant Garamond";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url("/fonts/CormorantGaramond-VariableFont_wght.woff2") format("woff2-variations");
+}
+
 @theme {
   --font-sans: "Inter", system-ui, sans-serif;
 
@@ -1012,4 +1028,86 @@ html, body {
     width: 180px;
     height: 180px;
   }
+}
+
+/* ========================================
+   Screensaver
+   ======================================== */
+.screensaver {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: #000;
+  color: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: screensaver-fade-in 0.6s ease-out;
+}
+
+@keyframes screensaver-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.screensaver-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 0 2rem;
+  text-align: center;
+}
+
+.screensaver-event {
+  font-family: "Italianno", "Great Vibes", cursive;
+  font-weight: 400;
+  font-size: clamp(4rem, 11vw, 11rem);
+  line-height: 1.05;
+  color: rgba(255, 255, 255, 0.96);
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 24px rgba(255, 255, 255, 0.08);
+}
+
+.screensaver-divider {
+  width: clamp(120px, 22vw, 320px);
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+}
+
+.screensaver-title {
+  font-family: "Cormorant Garamond", "Cormorant", "Playfair Display", Georgia, serif;
+  font-weight: 300;
+  font-size: clamp(1.75rem, 4.5vw, 4rem);
+  letter-spacing: 0.6em;
+  text-indent: 0.6em; /* compensate so wide tracking visually centers */
+  color: rgba(255, 255, 255, 0.88);
+  text-transform: uppercase;
+}
+
+.screensaver-hint {
+  position: absolute;
+  bottom: clamp(2rem, 6vh, 4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: "Cormorant Garamond", Georgia, serif;
+  font-size: clamp(1rem, 1.6vw, 1.35rem);
+  font-weight: 400;
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  animation: screensaver-hint-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes screensaver-hint-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
 }

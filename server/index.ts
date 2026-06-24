@@ -94,6 +94,8 @@ app.get('/api/config', (_req, res) => {
     mode: c.app.mode || 'prod',
     crop: c.preview.crop || null,
     shutterOffsetMs: c.app.shutterOffsetMs || 0,
+    eventName: c.app.eventName || null,
+    screensaverTimeoutSeconds: typeof c.app.screensaverTimeoutSeconds === 'number' ? c.app.screensaverTimeoutSeconds : 60,
     galleryEnabled: !!(gs && gs.enabled),
     video: videoConfig,
   };

@@ -59,7 +59,8 @@
     "enableEmail": true,
     "enablePhone": false,
     "mode": "dev",
-    "eventName": "",
+    "eventName": "Your Event Name",
+    "screensaverTimeoutSeconds": 60,
     "generateShareId": false,
     "periodicAutofocus": false,
     "galleryServer": {

@@ -28,6 +28,8 @@ export interface FrontendConfig {
   mode: 'dev' | 'prod';
   crop: CropConfig | null;
   shutterOffsetMs: number;
+  eventName: string | null;
+  screensaverTimeoutSeconds: number;
   galleryEnabled: boolean;
   video: FrontendVideoConfig;
 }
