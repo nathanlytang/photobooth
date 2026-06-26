@@ -37,10 +37,20 @@
     }
   },
   "preview": {
-    "device": "/dev/video0",
     "width": 1920,
     "height": 1080,
     "fps": 30,
+    "platform": {
+      "linux": {
+        "inputFormat": "v4l2",
+        "device": "/dev/video0"
+      },
+      "darwin": {
+        "inputFormat": "avfoundation",
+        "device": "0:none",
+        "pixelFormat": "uyvy422"
+      }
+    },
     "crop": {
       "enabled": false,
       "x": 0,

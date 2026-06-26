@@ -1,0 +1,157 @@
+{
+  "camera": {
+    "iso": "6400",
+    "shutterSpeed": "1/125",
+    "aperture": "5.6",
+    "captureTarget": "card",
+    "persistentMovieMode": true,
+    "paths": {
+      "iso": "iso",
+      "shutterSpeed": "shutterspeed",
+      "aperture": "f-number",
+      "pictureProfile": "/main/capturesettings/picturestyle",
+      "autofocus": "autofocusdrive",
+      "captureTarget": "capturetarget"
+    },
+    "startupConfigs": [
+      {
+        "path": "whitebalance",
+        "value": "Color Temperature"
+      },
+      {
+        "path": "d01e",
+        "value": "4600"
+      }
+    ],
+    "video": {
+      "iso": "800",
+      "shutterSpeed": "1/50",
+      "aperture": "2.8",
+      "paths": {
+        "iso": "movieiso",
+        "shutterSpeed": "movieshutterspeed",
+        "aperture": "movief-number"
+      },
+      "startupConfigs": []
+    },
+    "movie": {
+      "startConfigPath": "movie",
+      "startValue": "1",
+      "stopConfigPath": "movie",
+      "stopValue": "0",
+      "fileExtension": "mov"
+    }
+  },
+  "preview": {
+    "device": "/dev/video0",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "crop": {
+      "enabled": false,
+      "x": 160,
+      "y": 150,
+      "width": 1600,
+      "height": 700
+    }
+  },
+  "app": {
+    "port": 3000,
+    "sessionsDir": "./sessions",
+    "countdownSeconds": 5,
+    "shutterOffsetMs": 2000,
+    "cameraPosition": "above",
+    "lookText": "My eyes are up here!",
+    "enableEmail": true,
+    "enablePhone": false,
+    "mode": "dev",
+    "eventName": "Wedding of Sonia & Nathan",
+    "generateShareId": false,
+    "periodicAutofocus": false,
+    "galleryServer": {
+      "enabled": true,
+      "baseUrl": "http://192.168.1.100:4000",
+      "authToken": "change-me-to-a-secure-random-token",
+      "resize": {
+        "enabled": true,
+        "mode": "preset",
+        "preset": "web"
+      }
+    },
+    "notifications": {
+      "enabled": true,
+      "from": {
+        "email": "Sonia & Nathan <nathanandsonia2026@gmail.com>",
+        "sms": "+15555550123"
+      },
+      "subject": "Your photos from the {eventName}",
+      "emailTemplate": "<div>To our dearest guests,</div><div><br></div>Thank you for attending our wedding celebration!&nbsp; We are so blessed that you could make it out, and what a joy it is to celebrate with you.&nbsp; Your photobooth photos can be found here at this link: <a href=\"{shareUrl}\">{shareUrl}</a>!<div><br></div><div>Love,</div><div><br></div><div>Sonia &amp; Nathan</div>",
+      "smsTemplate": "We are so blessed that you could make it out to our celebration!  Your photos can be found here: {shareUrl}.  \n\nLove, Sonia & Nathan.",
+      "smtp": {
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "secure": false,
+        "user": "nathanandsonia2026@gmail.com",
+        "pass": "yxxn zzgf vhmv prmv"
+      },
+      "twilio": {
+        "accountSid": "",
+        "authToken": "",
+        "from": "+15555550123"
+      },
+      "options": {
+        "channel": "email",
+        "deleteAfterSend": false,
+        "skipAlreadySent": true,
+        "skipVideoSessions": true,
+        "maxAgeDays": 0,
+        "dryRun": false,
+        "continueOnError": true,
+        "mode": "all",
+        "retryQueuePath": "./scripts/sendShares.retry.json",
+        "runInitialSweep": false
+      }
+    },
+    "video": {
+      "enabled": true,
+      "maxRecordSeconds": 60,
+      "countdownSeconds": 5,
+      "startOffsetMs": 4800,
+      "prompts": [
+        "How do you know the couple, and what's your favorite memory with them?",
+        "What's one piece of advice you have for them?",
+        "What do you admire most about their relationship?",
+        "Where do you see them in 10 years?",
+        "What makes them perfect for each other?",
+        "When did you first realize they were the one for each other?",
+        "What was your first impression of their partner?",
+        "What's a moment that perfectly sums up their relationship?",
+        "Leave a message for them to watch on their 1st anniversary",
+        "What should they remember on tough days?",
+        "Record a message for their future kids",
+        "What's something they should never forget about today?",
+        "Act out what their life will look like in 20 years",
+        "Give them a toast in under 10 seconds",
+        "Sing or say something that reminds you of them"
+      ],
+      "promptsPersistDuringRecording": true,
+      "audio": {
+        "externalMic": {
+          "enabled": false,
+          "ffmpegInput": "-f alsa -i hw:1,0",
+          "sampleRate": 48000,
+          "channels": 2
+        }
+      },
+      "share": {
+        "enabled": false,
+        "upload": false,
+        "uploadTiming": "immediate"
+      }
+    }
+  },
+  "admin": {
+    "password": "change-me",
+    "sessionTtlMinutes": 240
+  }
+}
