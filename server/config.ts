@@ -87,11 +87,17 @@ function validate(cfg: PhotoboothConfig): void {
     }
   }
 
-  const requiredPreview: (keyof typeof cfg.preview)[] = ['device', 'width', 'height', 'fps'];
+  const requiredPreview: (keyof typeof cfg.preview)[] = ['width', 'height', 'fps', 'platform'];
   for (const key of requiredPreview) {
     if (cfg.preview[key] === undefined) {
       throw new Error(`Missing preview.${key} in config`);
     }
+  }
+  for (const platform of ['linux', 'darwin'] as const) {
+    const p = cfg.preview.platform?.[platform];
+    if (!p) throw new Error(`Missing preview.platform.${platform} in config`);
+    if (!p.inputFormat) throw new Error(`Missing preview.platform.${platform}.inputFormat in config`);
+    if (!p.device) throw new Error(`Missing preview.platform.${platform}.device in config`);
   }
 
   const requiredApp: (keyof typeof cfg.app)[] = ['port', 'sessionsDir', 'countdownSeconds'];

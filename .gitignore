@@ -142,6 +142,7 @@ vite.config.ts.timestamp-*
 
 # Photobooth config (copy config.example.json to config.json)
 config.json
+sendShares.retry.json
 
 # Photobooth session data
 sessions/

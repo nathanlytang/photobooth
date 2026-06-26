@@ -18,13 +18,27 @@ let restartTimeout: ReturnType<typeof setTimeout> | null = null;
 export function start(): void {
   const cfg = config.get().preview;
 
+  const platformKey = process.platform === 'darwin' ? 'darwin' : 'linux';
+  const platformCfg = cfg.platform[platformKey];
+  if (!platformCfg) {
+    console.error(`[preview] No preview.platform.${platformKey} config found; aborting`);
+    return;
+  }
+
+  // Platform-specific input args (must precede -i)
+  const inputArgs: string[] = ['-f', platformCfg.inputFormat];
+  if (platformCfg.pixelFormat) {
+    inputArgs.push('-pixel_format', platformCfg.pixelFormat);
+  }
+
   const args = [
-    '-f', 'v4l2',
-    '-input_format', 'mjpeg',
+    ...inputArgs,
     '-video_size', `${cfg.width}x${cfg.height}`,
     '-framerate', String(cfg.fps),
-    '-i', cfg.device,
-    '-c:v', 'copy',
+    '-i', platformCfg.device,
+    '-r', String(cfg.fps),
+    '-c:v', 'mjpeg',
+    '-q:v', '5',
     '-f', 'mjpeg',
     '-an',
     'pipe:1'
