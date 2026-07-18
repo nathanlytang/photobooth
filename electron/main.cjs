@@ -169,11 +169,21 @@ function maybeSpawnServer(layout) {
   } else if (app.isPackaged && layout.serverEntry) {
     // Run the bundled server using Electron's OWN Node runtime. This is what
     // makes the build portable: no system Node / pnpm / tsx required.
+    //
+    // A Finder-launched .app inherits a minimal PATH (/usr/bin:/bin:...) that
+    // excludes Homebrew, so the server's child processes (gphoto2, ffmpeg)
+    // would fail with ENOENT — no camera control and a black preview. Prepend
+    // the common Homebrew bin dirs so those external binaries are found.
+    const extraPaths = ['/opt/homebrew/bin', '/usr/local/bin'];
+    const mergedPath = [...extraPaths, process.env.PATH || '']
+      .filter(Boolean)
+      .join(path.delimiter);
     serverProcess = spawn(process.execPath, [layout.serverEntry], {
       cwd: layout.workdir,
       stdio: 'inherit',
       env: {
         ...process.env,
+        PATH: mergedPath,
         ELECTRON_RUN_AS_NODE: '1',
         NODE_ENV: 'production',
         PHOTOBOOTH_CONFIG: layout.configPath,
