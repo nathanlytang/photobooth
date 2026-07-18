@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LaunchAgent for the dedicated `photobooth` macOS login profile.
+
+  Install (while logged in as the photobooth user):
+    mkdir -p ~/Library/LaunchAgents
+    cp kiosk/com.photobooth.kiosk.plist ~/Library/LaunchAgents/
+    # edit the script path below to match your clone location
+    launchctl load ~/Library/LaunchAgents/com.photobooth.kiosk.plist
+
+  This starts the server + Electron kiosk at login and restarts them if they
+  crash. Combine with auto-login (Part 2 of the README) so the booth boots
+  straight into the kiosk with no human interaction.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.photobooth.kiosk</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/photobooth/photobooth/kiosk/start-kiosk.sh</string>
+  </array>
+
+  <!-- Start at login -->
+  <key>RunAtLoad</key>
+  <true/>
+
+  <!-- Restart if the kiosk ever exits/crashes -->
+  <key>KeepAlive</key>
+  <true/>
+
+  <!-- Throttle restart loop -->
+  <key>ThrottleInterval</key>
+  <integer>5</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/photobooth/photobooth/logs/kiosk-out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/photobooth/photobooth/logs/kiosk-error.log</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <!-- Optional: require a deliberate exit chord (default) and tweak it here -->
+    <key>KIOSK_EXIT_ACCELERATOR</key>
+    <string>Control+Alt+Shift+Q</string>
+  </dict>
+</dict>
+</plist>

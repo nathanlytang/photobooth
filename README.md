@@ -97,6 +97,162 @@ The web app also includes its own hardening layer (in case flags are unavailable
 - Pull-to-refresh / overscroll navigation disabled
 - Pinch-to-zoom disabled via `touch-action: manipulation`
 
+## macOS Electron Kiosk (Mac mini appliance)
+
+On macOS, run the booth as a dedicated Electron app instead of Chromium. Electron
+becomes the entire OS surface the guest sees: fullscreen, frameless, no menu, no
+popups, no navigation, no zoom, no devtools. **A touchscreen or mouse can never
+escape it** — the only way out is a deliberate physical-keyboard chord
+(default `Control+Option+Shift+Q`).
+
+This is a two-part setup: the Electron shell (Part 1, in this repo) and the
+macOS lockdown (Part 2, configured on the machine).
+
+### Part 1 — Electron shell
+
+Source lives in `electron/`:
+- `electron/main.cjs` — kiosk window + hardening + physical-keyboard exit + server wait/spawn
+- `electron/preload.cjs` — defense-in-depth page-level blocking (mirrors `KioskGuard`)
+
+Run it (starts the Express server **and** the kiosk together):
+
+```bash
+pnpm install      # pulls in electron + electron-builder
+pnpm build        # build the React frontend
+pnpm kiosk        # server (:3000) + Electron kiosk, full screen
+```
+
+Dev shell against Vite HMR (devtools + reload allowed):
+
+```bash
+pnpm dev          # terminal 1: server + vite (:5173)
+pnpm kiosk:dev    # terminal 2: Electron pointed at :5173, KIOSK_DEV=1
+```
+
+### Portable double-click build (for non-technical operators)
+
+Produce a single, self-contained `PhotoBooth.app` that launches **everything**
+(server + kiosk) with one double-click — no Node, pnpm, tsx, or terminal
+required on the target machine:
+
+```bash
+pnpm dist:mac
+```
+
+This runs three steps (`vite build` → `build:server` → `electron-builder --mac`)
+and outputs `release/mac-arm64/PhotoBooth.app`. Under the hood:
+- `scripts/build-server.mjs` bundles the TypeScript server into a single
+  `build/server/server.cjs` with esbuild.
+- electron-builder embeds the server bundle, the built frontend (`dist`), and
+  `config.example.json` inside the app's resources.
+- At launch the app spawns the bundled server using **Electron's own Node
+  runtime** (`ELECTRON_RUN_AS_NODE`), so the machine needs nothing installed
+  except `gphoto2` + `ffmpeg` (the external camera/capture binaries).
+
+**It respects `config.json`.** On first launch the app looks for a `config.json`
+in the folder that contains `PhotoBooth.app`. If none exists it seeds one from
+the bundled example. Edit that `config.json` (and it alone) to configure the
+booth — the kiosk even reads `app.port` from it to know which URL to load.
+Captured `sessions/` also land next to the app. To distribute, hand someone the
+**folder** containing `PhotoBooth.app` (+ its `config.json`); it's fully portable.
+
+```
+PhotoBooth/                 <- give this folder to the operator
+├── PhotoBooth.app          <- double-click to start the whole booth
+├── config.json             <- the only file they edit
+└── sessions/               <- captures collect here
+```
+
+> **Gatekeeper note:** the build is ad-hoc signed (no Apple Developer ID). On a
+> fresh Mac, the first launch needs a one-time unblock: right-click the app →
+> **Open** → **Open**, or run `xattr -dr com.apple.quarantine PhotoBooth.app`.
+> For the auto-login kiosk profile (Part 2) this only matters once.
+
+To build a different architecture (e.g. Intel), pass `--x64`/`--arm64` to
+electron-builder, or build on the matching machine.
+
+**Configuration** (all optional env vars read by `electron/main.cjs`):
+
+| Variable | Default | Description |
+|---|---|---|
+| `KIOSK_URL` | `http://localhost:3000` | URL the kiosk loads. Use `http://localhost:5173` for dev. |
+| `KIOSK_EXIT_ACCELERATOR` | `Control+Alt+Shift+Q` | Physical-keyboard chord that quits the kiosk. ("Alt" = Option on macOS.) |
+| `KIOSK_EXIT_PIN` | _(unset)_ | If set, the exit chord pops a confirm dialog before quitting. |
+| `KIOSK_SERVER_CMD` | _(unset)_ | If set, Electron spawns the server itself (e.g. `pnpm start`). Otherwise it waits for an already-running server. |
+| `KIOSK_STARTUP_TIMEOUT_MS` | `60000` | How long to poll the server URL before loading anyway. |
+| `KIOSK_DEV` | _(unset)_ | `1` re-enables devtools/reload and disables key blocking for debugging. |
+
+**What the shell enforces:**
+- Fullscreen + kiosk + frameless + always-on-top, single-instance only
+- No application menu (kills `Cmd+Q`/`Cmd+W`/`Cmd+H`/`Cmd+M` accelerators)
+- `Cmd/Ctrl+R`, `F5`, `F11`, `F12`, `Cmd+Tab`, devtools, and zoom keys blocked at the Chromium layer
+- New windows/popups denied; navigation off-origin blocked; `<webview>` denied
+- All browser permission requests (camera/mic/geolocation) denied
+- Pinch/keyboard zoom locked to 100%
+- Window cannot be closed and auto-recreates; renderer crashes auto-reload
+- **Exit only via the physical-keyboard chord** — no touch/mouse exit path is exposed
+
+### Part 2 — macOS lockdown (what you must do on the machine)
+
+Electron is ~70% of the lockdown; macOS gestures must be disabled at the OS
+level. Do this once on the Mac mini.
+
+**1. Dedicated kiosk login profile (recommended).**
+`System Settings → Users & Groups → Add Account…`
+- Name: `photobooth`, type **Standard** (not Admin)
+- This is the only account guests ever see. Keep your real admin account separate and hidden.
+
+**2. Auto-login into the kiosk account.**
+`System Settings → Users & Groups → Automatic login → photobooth`
+(Requires FileVault to be **off**; FileVault blocks auto-login.)
+
+**3. Auto-launch the kiosk at login.** Use the provided LaunchAgent so the
+server + Electron start automatically and restart on crash:
+
+```bash
+# While logged in as the photobooth user, with the repo at ~/photobooth:
+mkdir -p ~/Library/LaunchAgents ~/photobooth/logs
+cp ~/photobooth/kiosk/com.photobooth.kiosk.plist ~/Library/LaunchAgents/
+# edit the two /Users/photobooth/photobooth paths in the plist if your path differs
+launchctl load ~/Library/LaunchAgents/com.photobooth.kiosk.plist
+```
+
+`kiosk/start-kiosk.sh` is what the agent runs — it `cd`s into the project,
+builds the frontend if needed, and runs `pnpm kiosk`.
+
+If you built the **portable `.app`** instead of running from source, you don't
+need the script at all — just add `PhotoBooth.app` to
+`System Settings → General → Login Items`, or point a LaunchAgent's
+`ProgramArguments` at `["/usr/bin/open", "-W", "/path/to/PhotoBooth.app"]`.
+
+**4. Apply the scripted OS hardening:**
+
+```bash
+bash ~/photobooth/kiosk/harden-macos.sh
+```
+
+This auto-hides the Dock (with a huge reveal delay) and menu bar, disables all
+Hot Corners, and turns off Mission Control / full-screen-swipe / App Exposé
+trackpad gestures.
+
+**5. Disable the remaining escape surfaces by hand** (cannot be scripted safely):
+- `System Settings → Keyboard → Keyboard Shortcuts → Mission Control`: uncheck everything
+- `System Settings → Keyboard → Keyboard Shortcuts → Spotlight`: uncheck (or remove `Cmd+Space`)
+- `System Settings → Desktop & Dock`: turn off "Displays have separate Spaces"
+- Optionally disable Spotlight entirely: `sudo mdutil -a -i off`
+
+**6. Gold standard — MDM Single App Mode.** True iPad-style lockdown (only one
+app, no app switching, no Finder, no Settings) on macOS is only achievable via
+MDM (Jamf, Kandji, or free Apple Configurator). Enroll the Mac mini and push an
+**autonomous single-app / Single App Mode** restriction targeting the PhotoBooth
+app for maximum security. The Electron shell + the steps above get you a robust
+kiosk without MDM; MDM closes the last gaps.
+
+**7. Maintenance access.** To exit on-site, plug in a physical keyboard and press
+the exit chord (`Control+Option+Shift+Q`). Then log into your separate hidden
+admin account for any system changes. Optionally set `KIOSK_EXIT_PIN` in the
+LaunchAgent so the chord requires a confirmation step.
+
 ## Configuration
 
 Edit `config.json` to adjust camera and app settings.

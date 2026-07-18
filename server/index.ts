@@ -62,8 +62,11 @@ const app = express();
 app.use(express.json());
 app.use('/api/admin', adminRouter);
 
-// In production, serve the Vite build output
-const distPath = path.join(__dirname, '..', 'dist');
+// In production, serve the Vite build output. PHOTOBOOTH_DIST lets the packaged
+// kiosk point at the frontend bundled inside the app's resources.
+const distPath = process.env.PHOTOBOOTH_DIST
+  ? path.resolve(process.env.PHOTOBOOTH_DIST)
+  : path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }

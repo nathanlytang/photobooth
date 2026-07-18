@@ -1099,7 +1099,7 @@ html, body {
   left: 50%;
   transform: translateX(-50%);
   font-family: "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1rem, 1.6vw, 1.35rem);
+  font-size: clamp(2.5rem, 2.2vw, 2.5rem);
   font-weight: 400;
   letter-spacing: 0.35em;
   text-transform: uppercase;

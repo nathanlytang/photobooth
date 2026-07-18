@@ -7,8 +7,13 @@ import type { PhotoboothConfig } from './types.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const CONFIG_PATH = path.join(__dirname, '..', 'config.json');
-const CONFIG_BACKUP_PATH = path.join(__dirname, '..', 'config.json.bak');
+// Allow an external config.json to be supplied (e.g. by the packaged kiosk
+// executable, which keeps config.json next to the app so it stays editable).
+// Falls back to the project-root config.json for normal dev/prod runs.
+const CONFIG_PATH = process.env.PHOTOBOOTH_CONFIG
+  ? path.resolve(process.env.PHOTOBOOTH_CONFIG)
+  : path.join(__dirname, '..', 'config.json');
+const CONFIG_BACKUP_PATH = `${CONFIG_PATH}.bak`;
 
 let config: PhotoboothConfig | null = null;
 const emitter = new EventEmitter();

@@ -3,6 +3,7 @@
   "version": "2.0.0",
   "description": "Photobooth with HDMI capture live preview and gphoto2 camera control",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "concurrently -n server,vite -c blue,green \"tsx watch server/index.ts\" \"vite\"",
     "dev:server": "tsx watch server/index.ts",
@@ -12,7 +13,43 @@
     "preview": "vite preview",
     "notify": "tsx scripts/sendShares.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "electron": "electron electron/main.cjs",
+    "kiosk": "concurrently -k -n server,electron -c blue,magenta \"pnpm start\" \"electron electron/main.cjs\"",
+    "kiosk:dev": "KIOSK_URL=http://localhost:5173 KIOSK_DEV=1 electron electron/main.cjs",
+    "build:server": "node scripts/build-server.mjs",
+    "dist:mac": "pnpm build && pnpm build:server && electron-builder --mac"
+  },
+  "build": {
+    "appId": "com.photobooth.kiosk",
+    "productName": "PhotoBooth",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/server",
+        "to": "server"
+      },
+      {
+        "from": "dist",
+        "to": "dist"
+      },
+      {
+        "from": "config.example.json",
+        "to": "config.example.json"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.photography",
+      "target": [
+        "dir"
+      ]
+    }
   },
   "keywords": [
     "photobooth",
@@ -39,6 +76,9 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.1.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.0",
+    "esbuild": "^0.24.0",
     "lucide-react": "^0.468.0",
     "qrcode-generator": "^2.0.4",
     "react": "^19.0.0",
