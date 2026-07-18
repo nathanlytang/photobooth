@@ -76,7 +76,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "concurrently": "^9.1.0",
-    "electron": "^33.0.0",
+    "electron": "^39.8.5",
     "electron-builder": "^25.1.0",
     "esbuild": "^0.24.0",
     "lucide-react": "^0.468.0",
