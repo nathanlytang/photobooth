@@ -18,6 +18,7 @@ import PreviewCanvas from './components/PreviewCanvas';
 import KioskGuard from './components/KioskGuard';
 import LookIndicator from './components/LookIndicator';
 import IdleScreen from './components/IdleScreen';
+import ScreensaverScreen from './components/ScreensaverScreen';
 import SessionScreen from './components/SessionScreen';
 import ContactScreen from './components/ContactScreen';
 import ShareScreen from './components/ShareScreen';
@@ -39,6 +40,22 @@ export default function App() {
     state.loadConfig();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Arm/clear the screensaver based on idle-screen activity. The screensaver
+  // should only auto-appear while the user is sitting on the idle screen with
+  // no overlays/sessions in progress.
+  useEffect(() => {
+    const idleAndCalm = state.screen === 'idle' && state.overlay === null;
+    if (idleAndCalm) {
+      state.armScreensaver();
+    } else {
+      // Leaving idle — cancel any pending arming. We do NOT call
+      // dismissScreensaver() here because it re-arms the timer; the
+      // screensaver should only auto-arm while sitting on the idle screen.
+      state.clearScreensaverTimer();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.screen, state.overlay]);
 
   // Track look indicator pulsing based on overlay
   const lookPulsing = state.overlay === 'countdown';
@@ -419,6 +436,13 @@ export default function App() {
       <ProcessingOverlay active={state.overlay === 'processing'} label={state.processingLabel} />
       <SuccessOverlay active={state.overlay === 'success'} variant={state.successVariant} />
       <FlashOverlay active={state.flashActive} />
+
+      {/* Screensaver (top layer; shown after idle inactivity) */}
+      <ScreensaverScreen
+        active={state.screensaverActive}
+        eventName={state.config.eventName}
+        onDismiss={state.dismissScreensaver}
+      />
     </div>
   );
 }

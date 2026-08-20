@@ -84,6 +84,10 @@ out
 # Vite build output
 dist/
 
+# Kiosk build artifacts
+build/server/
+release/
+
 # Gatsby files
 .cache/
 # Comment in the public line in if your project uses Gatsby and not Next.js
@@ -142,6 +146,7 @@ vite.config.ts.timestamp-*
 
 # Photobooth config (copy config.example.json to config.json)
 config.json
+sendShares.retry.json
 
 # Photobooth session data
 sessions/

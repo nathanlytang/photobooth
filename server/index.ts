@@ -62,8 +62,11 @@ const app = express();
 app.use(express.json());
 app.use('/api/admin', adminRouter);
 
-// In production, serve the Vite build output
-const distPath = path.join(__dirname, '..', 'dist');
+// In production, serve the Vite build output. PHOTOBOOTH_DIST lets the packaged
+// kiosk point at the frontend bundled inside the app's resources.
+const distPath = process.env.PHOTOBOOTH_DIST
+  ? path.resolve(process.env.PHOTOBOOTH_DIST)
+  : path.join(__dirname, '..', 'dist');
 if (fs.existsSync(distPath)) {
   app.use(express.static(distPath));
 }
@@ -94,6 +97,8 @@ app.get('/api/config', (_req, res) => {
     mode: c.app.mode || 'prod',
     crop: c.preview.crop || null,
     shutterOffsetMs: c.app.shutterOffsetMs || 0,
+    eventName: c.app.eventName || null,
+    screensaverTimeoutSeconds: typeof c.app.screensaverTimeoutSeconds === 'number' ? c.app.screensaverTimeoutSeconds : 60,
     galleryEnabled: !!(gs && gs.enabled),
     video: videoConfig,
   };
@@ -688,32 +693,39 @@ function countLocalFilenamesUpTo(takeNumber: number): number {
 
 // Startup
 async function init(): Promise<void> {
-  // Detect and configure camera
-  try {
-    await camera.detectCamera();
-    // If the camera is meant to live in movie mode, run the video startup
-    // configs once up-front so the camera is in live-view before any session.
-    if (cfg.camera.persistentMovieMode) {
-      console.log('[init] persistentMovieMode enabled — applying video startupConfigs');
-      await camera.applyStartupConfigs('video');
-    } else {
-      await camera.applyStartupConfigs('photo');
-    }
-    await camera.applySettings('photo');
-  } catch (err) {
-    console.warn('[init] Camera setup failed (will retry on capture):', (err as Error).message);
-  }
-
-  // Start live preview
-  preview.start();
-
-  // Start HTTP server
+  // Start the HTTP server FIRST so the kiosk UI always loads, even when the
+  // camera or ffmpeg aren't available yet. Camera detection retries forever
+  // (maxRetries = Infinity), so awaiting it here would block server.listen()
+  // indefinitely — that manifests as a black screen in the Electron kiosk when
+  // gphoto2/ffmpeg can't be found (e.g. a Finder-launched .app with a minimal
+  // PATH). Detection/config therefore runs in the background below.
   server.listen(cfg.app.port, () => {
     console.log(`[server] Photobooth running at http://localhost:${cfg.app.port}`);
   });
 
   // Start notification service if enabled in config (no-op when disabled).
   notifications.start();
+
+  // Start live preview (auto-retries internally if ffmpeg isn't ready).
+  preview.start();
+
+  // Detect and configure the camera in the background — never blocks the server.
+  (async () => {
+    try {
+      await camera.detectCamera();
+      // If the camera is meant to live in movie mode, run the video startup
+      // configs once up-front so the camera is in live-view before any session.
+      if (cfg.camera.persistentMovieMode) {
+        console.log('[init] persistentMovieMode enabled — applying video startupConfigs');
+        await camera.applyStartupConfigs('video');
+      } else {
+        await camera.applyStartupConfigs('photo');
+      }
+      await camera.applySettings('photo');
+    } catch (err) {
+      console.warn('[init] Camera setup failed (will retry on capture):', (err as Error).message);
+    }
+  })();
 }
 
 // Graceful shutdown

@@ -17,6 +17,8 @@ const DEFAULT_CONFIG: FrontendConfig = {
   mode: typeof window !== 'undefined' && window.location.port === '5173' ? 'dev' : 'prod',
   crop: null,
   shutterOffsetMs: 0,
+  eventName: null,
+  screensaverTimeoutSeconds: 60,
   galleryEnabled: false,
   video: {
     enabled: false,
@@ -39,6 +41,7 @@ export function useAppState() {
   const [pendingShareUrl, setPendingShareUrl] = useState<string | null>(null);
   const [sessionPhotoCount, setSessionPhotoCount] = useState(0);
   const [flashActive, setFlashActive] = useState(false);
+  const [screensaverActive, setScreensaverActive] = useState(false);
 
   // Video-guestbook state
   const [sessionType, setSessionType] = useState<'photo' | 'video' | null>(null);
@@ -58,6 +61,31 @@ export function useAppState() {
   // Refs for countdown timer management
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const triggerTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Screensaver — black overlay shown after inactivity on the idle screen.
+  const screensaverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const screensaverTimeoutMsRef = useRef<number>(60_000);
+
+  const clearScreensaverTimer = useCallback(() => {
+    if (screensaverTimerRef.current) {
+      clearTimeout(screensaverTimerRef.current);
+      screensaverTimerRef.current = null;
+    }
+  }, []);
+
+  const armScreensaver = useCallback(() => {
+    clearScreensaverTimer();
+    const ms = screensaverTimeoutMsRef.current;
+    if (!ms || ms <= 0) return;
+    screensaverTimerRef.current = setTimeout(() => {
+      setScreensaverActive(true);
+    }, ms);
+  }, [clearScreensaverTimer]);
+
+  const dismissScreensaver = useCallback(() => {
+    setScreensaverActive(false);
+    armScreensaver();
+  }, [armScreensaver]);
 
   // Idle timeout — auto-reset to idle after 2 minutes of no interaction
   const IDLE_TIMEOUT_MS = 2 * 60 * 1000;
@@ -109,6 +137,10 @@ export function useAppState() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const cfg = await res.json() as FrontendConfig;
         setConfig(cfg);
+        screensaverTimeoutMsRef.current = (cfg.screensaverTimeoutSeconds ?? 60) * 1000;
+        // Arm the screensaver now that we know the configured delay; the
+        // useEffect in App.tsx will also keep it in sync with screen changes.
+        armScreensaver();
         return;
       } catch (err) {
         console.warn(`[config] Fetch attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message);
@@ -306,6 +338,7 @@ export function useAppState() {
     pendingShareUrl,
     sessionPhotoCount,
     flashActive,
+    screensaverActive,
     sessionType,
     selectedPrompt,
     keptTakeCount,
@@ -337,6 +370,9 @@ export function useAppState() {
     resetSession,
     startCountdown,
     clearCountdown,
+    armScreensaver,
+    clearScreensaverTimer,
+    dismissScreensaver,
     resetIdleTimeout,
     clearIdleTimeout,
     beginVideoSession,

@@ -50,11 +50,20 @@ export interface CropConfig {
   height: number;
 }
 
-export interface PreviewConfig {
+export interface PreviewPlatformConfig {
+  inputFormat: string;
   device: string;
+  pixelFormat?: string;
+}
+
+export interface PreviewConfig {
   width: number;
   height: number;
   fps: number;
+  platform: {
+    linux: PreviewPlatformConfig;
+    darwin: PreviewPlatformConfig;
+  };
   crop?: CropConfig;
 }
 

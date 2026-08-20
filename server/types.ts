@@ -88,11 +88,20 @@ export interface CropConfig {
   height: number;
 }
 
-export interface PreviewConfig {
+export interface PreviewPlatformConfig {
+  inputFormat: string;
   device: string;
+  pixelFormat?: string;
+}
+
+export interface PreviewConfig {
   width: number;
   height: number;
   fps: number;
+  platform: {
+    linux: PreviewPlatformConfig;
+    darwin: PreviewPlatformConfig;
+  };
   crop?: CropConfig;
 }
 
@@ -205,6 +214,7 @@ export interface AppConfig {
   enablePhone?: boolean;
   mode?: 'dev' | 'prod';
   eventName?: string;
+  screensaverTimeoutSeconds?: number;
   generateShareId?: boolean;
   periodicAutofocus?: boolean;
   galleryServer?: GalleryServerConfig;
@@ -389,6 +399,8 @@ export interface FrontendConfig {
   mode: 'dev' | 'prod';
   crop: CropConfig | null;
   shutterOffsetMs: number;
+  eventName: string | null;
+  screensaverTimeoutSeconds: number;
   galleryEnabled: boolean;
   video: FrontendVideoConfig;
 }
