@@ -59,7 +59,7 @@
   "dependencies": {
     "express": "^5.2.1",
     "nanoid": "^6.0.1",
-    "nodemailer": "^9.1.1",
+    "nodemailer": "^10.1.4",
     "react-simple-wysiwyg": "^3.4.1",
     "ws": "^8.21.3"
   },
